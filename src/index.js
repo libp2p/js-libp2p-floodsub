@@ -141,6 +141,10 @@ function PubSubGossip (libp2pNode, dagService) {
     })
   }
 
+  this.connect = (peerInfo) => {
+    dial(peerInfo)
+  }
+
   this.getPeerSet = () => {
     return peerSet
   }
