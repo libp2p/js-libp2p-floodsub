@@ -1,5 +1,4 @@
 'use strict'
-
 module.exports = `
 message RPC {
   repeated SubOpts subscriptions = 1;

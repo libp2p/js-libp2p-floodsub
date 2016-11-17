@@ -1,5 +1,4 @@
 'use strict'
-
 module.exports = `
 // topicCID = cid(merkledag_protobuf(topicDescriptor)); (not the topic.name)
 message TopicDescriptor {
