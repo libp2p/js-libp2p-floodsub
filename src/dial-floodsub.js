@@ -5,6 +5,7 @@ const log = config.log
 const multicodec = config.multicodec
 const stream = require('stream')
 const PassThrough = stream.PassThrough
+const pb = require('./message')
 const toPull = require('stream-to-pull-stream')
 const lp = require('pull-length-prefixed')
 const pull = require('pull-stream')
@@ -51,7 +52,24 @@ module.exports = (libp2pNode, peerSet, subscriptions) => {
       )
 
       if (subscriptions.length > 0) {
-        // TODO send my subscriptions through the new conn
+        // send my subscriptions through the new conn
+        const peers = Object
+                        .keys(peerSet)
+                        .map((idB58Str) => peerSet[idB58Str])
+
+        peers.forEach((peer) => {
+          const subopts = subscriptions.map((topic) => {
+            return {
+              subscribe: true,
+              topicCID: topic
+            }
+          })
+          const rpc = pb.rpc.RPC.encode({
+            subscriptions: subopts
+          })
+
+          peer.stream.write(rpc)
+        })
       }
     }
   }
