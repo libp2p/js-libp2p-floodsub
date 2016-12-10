@@ -1,4 +1,5 @@
 /* eslint-env mocha */
+/* eslint max-nested-callbacks: ["error", 5] */
 'use strict'
 
 const expect = require('chai').expect
@@ -13,7 +14,7 @@ const _values = require('lodash.values')
 
 const PSG = require('../src')
 
-describe.only('basics', () => {
+describe('basics', () => {
   let nodeA
   let nodeB
   let psA
