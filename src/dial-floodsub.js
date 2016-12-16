@@ -13,9 +13,10 @@ const multicodec = config.multicodec
 module.exports = (libp2p, peers, subscriptions) => {
   return (peerInfo) => {
     const idB58Str = peerInfo.id.toB58String()
+    log('dialing %s', idB58Str)
 
     // If already have a PubSub conn, ignore
-    let peer = peers.get(idB58Str)
+    let peer = peers[idB58Str]
     if (peer && peer.conn) {
       return
     }
@@ -37,10 +38,11 @@ module.exports = (libp2p, peers, subscriptions) => {
           topics: new Set(),
           stream: null
         }
-        peers.set(idB58Str, peer)
       }
 
       peer.stream = new Pushable()
+
+      peers[idB58Str] = peer
 
       pull(
         peer.stream,
@@ -62,7 +64,9 @@ module.exports = (libp2p, peers, subscriptions) => {
           subscriptions: subs
         })
 
-        peers[idB58Str].stream.push(rpc)
+        if (peer && peer.stream) {
+          peer.stream.push(rpc)
+        }
       }
     }
   }

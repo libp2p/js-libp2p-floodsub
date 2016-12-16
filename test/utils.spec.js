@@ -5,7 +5,7 @@ const expect = require('chai').expect
 
 const utils = require('../src/utils')
 
-describe.only('utils', () => {
+describe('utils', () => {
   it('anyMatch', () => {
     [
       [[1, 2, 3], [4, 5, 6], false],
@@ -17,6 +17,12 @@ describe.only('utils', () => {
     ].forEach((test) => {
       expect(
         utils.anyMatch(new Set(test[0]), new Set(test[1]))
+      ).to.be.eql(
+        test[2]
+      )
+
+      expect(
+        utils.anyMatch(new Set(test[0]), test[1])
       ).to.be.eql(
         test[2]
       )

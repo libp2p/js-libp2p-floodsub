@@ -93,11 +93,11 @@ describe('multiple nodes', () => {
         setTimeout(() => {
           const peersB = _values(b.ps.getPeerSet())
           expect(peersB.length).to.equal(2)
-          expect(peersB[1].topics).to.eql(['Z'])
+          expect(Array.from(peersB[1].topics)).to.eql(['Z'])
 
           const peersC = _values(c.ps.getPeerSet())
           expect(peersC.length).to.equal(1)
-          expect(peersC[0].topics).to.eql([])
+          expect(Array.from(peersC[0].topics)).to.eql([])
           done()
         }, 200)
       })
@@ -109,11 +109,11 @@ describe('multiple nodes', () => {
         setTimeout(() => {
           const peersA = _values(a.ps.getPeerSet())
           expect(peersA.length).to.equal(1)
-          expect(peersA[0].topics).to.eql(['Z'])
+          expect(Array.from(peersA[0].topics)).to.eql(['Z'])
 
           const peersC = _values(c.ps.getPeerSet())
           expect(peersC.length).to.equal(1)
-          expect(peersC[0].topics).to.eql(['Z'])
+          expect(Array.from(peersC[0].topics)).to.eql(['Z'])
           done()
         }, 200)
       })
@@ -125,12 +125,12 @@ describe('multiple nodes', () => {
         setTimeout(() => {
           const peersA = _values(a.ps.getPeerSet())
           expect(peersA.length).to.equal(1)
-          expect(peersA[0].topics).to.eql(['Z'])
+          expect(Array.from(peersA[0].topics)).to.eql(['Z'])
 
           const peersB = _values(b.ps.getPeerSet())
           expect(peersB.length).to.equal(2)
-          expect(peersB[0].topics).to.eql(['Z'])
-          expect(peersB[1].topics).to.eql(['Z'])
+          expect(Array.from(peersB[0].topics)).to.eql(['Z'])
+          expect(Array.from(peersB[1].topics)).to.eql(['Z'])
           done()
         }, 200)
       })

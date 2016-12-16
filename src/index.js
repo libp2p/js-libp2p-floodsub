@@ -2,7 +2,7 @@
 
 const EventEmitter = require('events').EventEmitter
 const TimeCache = require('time-cache')
-const _values = require('lodash.values')
+const values = require('lodash.values')
 
 const utils = require('./utils')
 const pb = require('./message')
@@ -22,20 +22,25 @@ class PubSubGossip extends EventEmitter {
     this.cache = new TimeCache()
 
     // Map of peerIdBase58Str: { conn, topics, peerInfo }
-    this.peers = new Map()
+    this.peers = {}
 
     // List of our subscriptions
     this.subscriptions = new Set()
 
-    const dial = dialOnFloodSub(libp2pNode, this.peers, this.subscriptions)
-    mountFloodSub(libp2pNode, this.peers, this.cache, this.subscriptions, this)
+    const dial = dialOnFloodSub(
+      this.libp2p, this.peers, this.subscriptions
+    )
+    mountFloodSub(
+      this.libp2p, this.peers, this.cache, this.subscriptions, this
+    )
 
     // Speed up any new peer that comes in my way
     this.libp2p.swarm.on('peer-mux-established', dial)
 
     // Dial already connected peers
-    const connectedPeers = libp2pNode.peerBook.getAll()
-    _values(connectedPeers).forEach(dial)
+    values(
+      libp2pNode.peerBook.getAll()
+    ).forEach(dial)
   }
 
   publish (topics, messages) {
@@ -53,13 +58,15 @@ class PubSubGossip extends EventEmitter {
       }
     })
 
+    const from = this.libp2p.peerInfo.id.toB58String()
+
     // send to all the other peers
-    for (let peer of this.peers.values()) {
+    for (let peer of values(this.peers)) {
+      log(peer.topics, topics)
+
       if (utils.anyMatch(peer.topics, topics)) {
         const msgs = messages.map((message) => {
           const seqno = utils.randomSeqno()
-          const from = this.libp2p.peerInfo.id.toB58String()
-
           this.cache.put(utils.msgId(from, seqno))
 
           return {
@@ -89,13 +96,14 @@ class PubSubGossip extends EventEmitter {
       }
     })
 
-    for (let peer of this.peers.values()) {
+    for (let peer of values(this.peers)) {
       const subopts = topics.map((topic) => {
         return {
           subscribe: true,
           topicCID: topic
         }
       })
+
       const rpc = pb.rpc.RPC.encode({
         subscriptions: subopts
       })
@@ -111,7 +119,7 @@ class PubSubGossip extends EventEmitter {
       this.subscriptions.delete(topic)
     })
 
-    for (let peer of this.peers.values()) {
+    for (let peer of values(this.peers)) {
       const subopts = topics.map((topic) => {
         return {
           subscribe: false,
@@ -122,16 +130,18 @@ class PubSubGossip extends EventEmitter {
         subscriptions: subopts
       })
 
-      peer.stream.write(rpc)
+      peer.stream.push(rpc)
     }
   }
 
+  // TODO: remove usage in tests
   getPeerSet () {
     return this.peers
   }
 
+  // TODO: remove usage in tests
   getSubscriptions () {
-    return this.subscriptions
+    return Array.from(this.subscriptions)
   }
 }
 

@@ -15,13 +15,20 @@ exports.msgId = (from, seqno) => {
  * Check if any member of the first set is also a member
  * of the second set.
  *
- * @param {Set} a
- * @param {Set} b
+ * @param {Set|Array} a
+ * @param {Set|Array} b
  * @returns {boolean}
  */
 exports.anyMatch = (a, b) => {
+  let bHas
+  if (Array.isArray(b)) {
+    bHas = (val) => b.indexOf(val) > -1
+  } else {
+    bHas = (val) => b.has(val)
+  }
+
   for (let val of a) {
-    if (b.has(val)) {
+    if (bHas(val)) {
       return true
     }
   }

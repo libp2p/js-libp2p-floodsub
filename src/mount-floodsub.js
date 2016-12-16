@@ -2,6 +2,7 @@
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
+const values = require('lodash.values')
 
 const pb = require('./message')
 const utils = require('./utils')
@@ -29,13 +30,13 @@ function mountFloodSub (libp2p, peers, cache, subscriptions, ee) {
       // populate
       const idB58Str = peerInfo.id.toB58String()
 
-      if (!peers.has(idB58Str)) {
-        peers.set(idB58Str, {
+      if (!peers[idB58Str]) {
+        peers[idB58Str] = {
           peerInfo: peerInfo,
           topics: new Set(),
           conn: null,
           stream: null
-        })
+        }
       }
 
       // process the messages
@@ -43,17 +44,12 @@ function mountFloodSub (libp2p, peers, cache, subscriptions, ee) {
         conn,
         lp.decode(),
         pull.map((data) => pb.rpc.RPC.decode(data)),
-        pull.collect((err, res) => {
-          if (err) {
-            // TODO: remove peer from peers
-            return log.err(err)
-          }
-
-          if (!res || !res.length) {
+        pull.drain((rpc) => {
+          log('handling', rpc)
+          if (!rpc) {
             return
           }
 
-          const rpc = res[0]
           const subs = rpc.subscriptions
           const msgs = rpc.msgs
 
@@ -64,21 +60,23 @@ function mountFloodSub (libp2p, peers, cache, subscriptions, ee) {
           if (msgs && msgs.length) {
             handleMessages(rpc.msgs)
           }
+        }, (err) => {
+          if (err) {
+            log.err(err)
+          }
+          // TODO: delete peer
         })
       )
     })
 
-    function handleSubscriptions (subs, idB58Str) {
-      const peer = peers.get(idB58Str)
-      if (!peer) {
-        return log.error('peer not found %s', idB58Str)
-      }
+    function handleSubscriptions (subs, id) {
+      const peer = peers[id]
 
       subs.forEach((subopt) => {
         if (subopt.subscribe) {
-          peer.topics.push(subopt.topicCID)
+          peer.topics.add(subopt.topicCID)
         } else {
-          peer.topics.delete(subopt)
+          peer.topics.delete(subopt.topicCID)
         }
       })
     }
@@ -101,8 +99,9 @@ function mountFloodSub (libp2p, peers, cache, subscriptions, ee) {
         })
 
         // 3. propagate msg to others
-        for (let peer of peers.values()) {
-          if (utils.matchAny(peer.topics, msg.topicCIDs)) {
+        for (let peer of values(peers)) {
+          if (peer.stream &&
+              utils.anyMatch(peer.topics, msg.topicCIDs)) {
             const rpc = pb.rpc.RPC.encode({
               msgs: [msg]
             })
