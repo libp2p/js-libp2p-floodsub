@@ -1,56 +1,52 @@
 'use strict'
 
-const EE = require('events').EventEmitter
-const util = require('util')
+const EventEmitter = require('events').EventEmitter
 const TimeCache = require('time-cache')
+const _values = require('lodash.values')
+
 const utils = require('./utils')
 const pb = require('./message')
 const config = require('./config')
-const log = config.log
-const _intersection = require('lodash.intersection')
 const dialOnFloodSub = require('./dial-floodsub.js')
 const mountFloodSub = require('./mount-floodsub.js')
-const _values = require('lodash.values')
 
-module.exports = PubSubGossip
+const log = config.log
+const ensureArray = utils.ensureArray
 
-util.inherits(PubSubGossip, EE)
+class PubSubGossip extends EventEmitter {
+  constructor (libp2pNode, dagService) {
+    super()
 
-function PubSubGossip (libp2pNode, dagService) {
-  if (!(this instanceof PubSubGossip)) {
-    return new PubSubGossip(libp2pNode)
+    this.dag = dagService
+    this.libp2p = libp2pNode
+    this.cache = new TimeCache()
+
+    // Map of peerIdBase58Str: { conn, topics, peerInfo }
+    this.peers = new Map()
+
+    // List of our subscriptions
+    this.subscriptions = new Set()
+
+    const dial = dialOnFloodSub(libp2pNode, this.peers, this.subscriptions)
+    mountFloodSub(libp2pNode, this.peers, this.cache, this.subscriptions, this)
+
+    // Speed up any new peer that comes in my way
+    this.libp2p.swarm.on('peer-mux-established', dial)
+
+    // Dial already connected peers
+    const connectedPeers = libp2pNode.peerBook.getAll()
+    _values(connectedPeers).forEach(dial)
   }
 
-  EE.call(this)
-
-  const tc = new TimeCache()
-
-  // map of peerIdBase58Str: { conn, topics, peerInfo }
-  const peerSet = {}
-
-  // list of our subscriptions
-  const subscriptions = []
-
-  // map of peerId: [] (size 10)
-  //   check if not contained + newer than older
-  //   if passes, shift, push, sort
-  //   (if needed, i.e. not the newest)
-
-  const dial = dialOnFloodSub(libp2pNode, peerSet, subscriptions)
-  mountFloodSub(libp2pNode, peerSet, tc, subscriptions, this)
-
-  this.publish = (topics, messages) => {
+  publish (topics, messages) {
     log('publish', topics, messages)
-    if (!Array.isArray(topics)) {
-      topics = [topics]
-    }
-    if (!Array.isArray(messages)) {
-      messages = [messages]
-    }
+
+    topics = ensureArray(topics)
+    messages = ensureArray(messages)
 
     // emit to self if I'm interested
     topics.forEach((topic) => {
-      if (subscriptions.indexOf(topic) !== -1) {
+      if (this.subscriptions.has(topic)) {
         messages.forEach((message) => {
           this.emit(topic, message)
         })
@@ -58,22 +54,22 @@ function PubSubGossip (libp2pNode, dagService) {
     })
 
     // send to all the other peers
-    const peers = Object
-                    .keys(peerSet)
-                    .map((idB58Str) => peerSet[idB58Str])
-
-    peers.forEach((peer) => {
-      if (_intersection(peer.topics, topics).length > 0) {
+    for (let peer of this.peers.values()) {
+      if (utils.anyMatch(peer.topics, topics)) {
         const msgs = messages.map((message) => {
-          const msg = {
-            from: libp2pNode.peerInfo.id.toB58String(),
+          const seqno = utils.randomSeqno()
+          const from = this.libp2p.peerInfo.id.toB58String()
+
+          this.cache.put(utils.msgId(from, seqno))
+
+          return {
+            from: from,
             data: message,
-            seqno: new Buffer(utils.randomSeqno()),
+            seqno: new Buffer(seqno),
             topicCIDs: topics
           }
-          tc.put(utils.msgId(msg.from, msg.seqno.toString()))
-          return msg
         })
+
         const rpc = pb.rpc.RPC.encode({
           msgs: msgs
         })
@@ -81,25 +77,19 @@ function PubSubGossip (libp2pNode, dagService) {
         peer.stream.write(rpc)
         log('publish msgs on topics', topics, peer.peerInfo.id.toB58String())
       }
-    })
+    }
   }
 
-  this.subscribe = (topics) => {
-    if (!Array.isArray(topics)) {
-      topics = [topics]
-    }
+  subscribe (topics) {
+    topics = ensureArray(topics)
 
     topics.forEach((topic) => {
-      if (subscriptions.indexOf(topic) === -1) {
-        subscriptions.push(topic)
+      if (!this.subscriptions.has(topic)) {
+        this.subscriptions.add(topic)
       }
     })
 
-    const peers = Object
-                    .keys(peerSet)
-                    .map((idB58Str) => peerSet[idB58Str])
-
-    peers.forEach((peer) => {
+    for (let peer of this.peers.values()) {
       const subopts = topics.map((topic) => {
         return {
           subscribe: true,
@@ -111,22 +101,17 @@ function PubSubGossip (libp2pNode, dagService) {
       })
 
       peer.stream.write(rpc)
-    })
+    }
   }
 
-  this.unsubscribe = (topics) => {
-    if (!Array.isArray(topics)) {
-      topics = [topics]
-    }
+  unsubscribe (topics) {
+    topics = ensureArray(topics)
 
     topics.forEach((topic) => {
-      const index = subscriptions.indexOf(topic)
-      if (index > -1) {
-        subscriptions.splice(index, 1)
-      }
+      this.subscriptions.delete(topic)
     })
 
-    _values(peerSet).forEach((peer) => {
+    for (let peer of this.peers.values()) {
       const subopts = topics.map((topic) => {
         return {
           subscribe: false,
@@ -138,23 +123,16 @@ function PubSubGossip (libp2pNode, dagService) {
       })
 
       peer.stream.write(rpc)
-    })
+    }
   }
 
-  this.getPeerSet = () => {
-    return peerSet
+  getPeerSet () {
+    return this.peers
   }
 
-  this.getSubscriptions = () => {
-    return subscriptions
+  getSubscriptions () {
+    return this.subscriptions
   }
-
-  function onStart () {
-    const connectedPeers = libp2pNode.peerBook.getAll()
-    _values(connectedPeers).forEach(dial)
-  }
-  onStart()
-
-  // speed up any new peer that comes in my way
-  libp2pNode.swarm.on('peer-mux-established', dial)
 }
+
+module.exports = PubSubGossip
