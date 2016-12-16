@@ -1,22 +1,22 @@
 'use strict'
 
-const config = require('./config')
-const log = config.log
-const multicodec = config.multicodec
 const pull = require('pull-stream')
-const _uniq = require('lodash.uniq')
-const _intersection = require('lodash.intersection')
 const lp = require('pull-length-prefixed')
+
 const pb = require('./message')
 const utils = require('./utils')
+const config = require('./config')
+
+const log = config.log
+const multicodec = config.multicodec
 
 module.exports = mountFloodSub
 
-function mountFloodSub (libp2pNode, peerSet, tc, subscriptions, ee) {
-  // note: we don't use the incomming conn to send, just to receive
-  libp2pNode.handle(multicodec, incConn)
+function mountFloodSub (libp2p, peers, cache, subscriptions, ee) {
+  // Note: we don't use the incomming conn to send, just to receive
+  libp2p.handle(multicodec, incomingConnection)
 
-  function incConn (protocol, conn) {
+  function incomingConnection (protocol, conn) {
     conn.getPeerInfo((err, peerInfo) => {
       if (err) {
         log.err('Failed to identify incomming conn', err)
@@ -29,74 +29,88 @@ function mountFloodSub (libp2pNode, peerSet, tc, subscriptions, ee) {
       // populate
       const idB58Str = peerInfo.id.toB58String()
 
-      if (!peerSet[idB58Str]) {
-        peerSet[idB58Str] = {
+      if (!peers.has(idB58Str)) {
+        peers.set(idB58Str, {
           peerInfo: peerInfo,
-          topics: []
-        }
+          topics: new Set(),
+          conn: null,
+          stream: null
+        })
       }
 
       // process the messages
       pull(
         conn,
         lp.decode(),
-        pull.drain((data) => {
-          const rpc = pb.rpc.RPC.decode(data)
-          if (rpc.subscriptions) {
-            rpc.subscriptions.forEach((subopt) => {
-              if (subopt.subscribe) {
-                peerSet[idB58Str].topics.push(subopt.topicCID)
-              } else {
-                const index = peerSet[idB58Str].topics.indexOf(subopt.topicCID)
-                if (index > -1) {
-                  peerSet[idB58Str].topics.splice(index, 1)
-                }
-              }
-            })
-
-            peerSet[idB58Str].topics = _uniq(peerSet[idB58Str].topics)
-          }
-
-          if (rpc.msgs.length > 0) {
-            rpc.msgs.forEach((msg) => {
-              // 1. check if I've seen the message, if yes, ignore
-              if (tc.has(utils.msgId(msg.from, msg.seqno.toString()))) {
-                return
-              } else {
-                tc.put(utils.msgId(msg.from, msg.seqno.toString()))
-              }
-
-              // 2. emit to self
-              msg.topicCIDs.forEach((topic) => {
-                if (subscriptions.indexOf(topic) !== -1) {
-                  ee.emit(topic, msg.data)
-                }
-              })
-
-              // 3. propagate msg to others
-              const peers = Object
-                    .keys(peerSet)
-                    .map((idB58Str) => peerSet[idB58Str])
-
-              peers.forEach((peer) => {
-                if (_intersection(peer.topics, msg.topicCIDs).length > 0) {
-                  const rpc = pb.rpc.RPC.encode({
-                    msgs: [msg]
-                  })
-
-                  peer.stream.write(rpc)
-                }
-              })
-            })
-          }
-        }, (err) => {
+        pull.map((data) => pb.rpc.RPC.decode(data)),
+        pull.collect((err, res) => {
           if (err) {
+            // TODO: remove peer from peers
             return log.err(err)
           }
-          // TODO
-          //   remove peer from peerSet
+
+          if (!res || !res.length) {
+            return
+          }
+
+          const rpc = res[0]
+          const subs = rpc.subscriptions
+          const msgs = rpc.msgs
+
+          if (subs && subs.length) {
+            handleSubscriptions(rpc.subscriptions, idB58Str)
+          }
+
+          if (msgs && msgs.length) {
+            handleMessages(rpc.msgs)
+          }
         })
       )
     })
+
+    function handleSubscriptions (subs, idB58Str) {
+      const peer = peers.get(idB58Str)
+      if (!peer) {
+        return log.error('peer not found %s', idB58Str)
+      }
+
+      subs.forEach((subopt) => {
+        if (subopt.subscribe) {
+          peer.topics.push(subopt.topicCID)
+        } else {
+          peer.topics.delete(subopt)
+        }
+      })
+    }
+
+    function handleMessages (msgs) {
+      msgs.forEach((msg) => {
+        const seqno = utils.msgId(msg.from, msg.seqno.toString())
+        // 1. check if I've seen the message, if yes, ignore
+        if (cache.has(seqno)) {
+          return
+        }
+
+        cache.put(seqno)
+
+        // 2. emit to self
+        msg.topicCIDs.forEach((topic) => {
+          if (subscriptions.has(topic)) {
+            ee.emit(topic, msg.data)
+          }
+        })
+
+        // 3. propagate msg to others
+        for (let peer of peers.values()) {
+          if (utils.matchAny(peer.topics, msg.topicCIDs)) {
+            const rpc = pb.rpc.RPC.encode({
+              msgs: [msg]
+            })
+
+            peer.stream.push(rpc)
+          }
+        }
+      })
+    }
   }
 }

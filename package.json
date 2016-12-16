@@ -55,9 +55,8 @@
     "debug": "^2.4.4",
     "git-sha1": "^0.1.2",
     "length-prefixed-stream": "^1.5.1",
-    "lodash.intersection": "^4.4.0",
-    "lodash.uniq": "^4.5.0",
     "lodash.values": "^4.3.0",
+    "pull-pushable": "^2.0.1",
     "time-cache": "^0.2.3"
   },
   "contributors": [

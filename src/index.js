@@ -74,7 +74,7 @@ class PubSubGossip extends EventEmitter {
           msgs: msgs
         })
 
-        peer.stream.write(rpc)
+        peer.stream.push(rpc)
         log('publish msgs on topics', topics, peer.peerInfo.id.toB58String())
       }
     }
@@ -100,7 +100,7 @@ class PubSubGossip extends EventEmitter {
         subscriptions: subopts
       })
 
-      peer.stream.write(rpc)
+      peer.stream.push(rpc)
     }
   }
 

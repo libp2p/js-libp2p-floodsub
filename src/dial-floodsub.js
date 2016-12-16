@@ -1,25 +1,26 @@
 'use strict'
 
-const config = require('./config')
-const pb = require('./message')
-const log = config.log
-const multicodec = config.multicodec
-const stream = require('stream')
-const PassThrough = stream.PassThrough
-const toPull = require('stream-to-pull-stream')
 const lp = require('pull-length-prefixed')
 const pull = require('pull-stream')
+const Pushable = require('pull-pushable')
 
-module.exports = (libp2pNode, peerSet, subscriptions) => {
+const config = require('./config')
+const pb = require('./message')
+
+const log = config.log
+const multicodec = config.multicodec
+
+module.exports = (libp2p, peers, subscriptions) => {
   return (peerInfo) => {
     const idB58Str = peerInfo.id.toB58String()
 
     // If already have a PubSub conn, ignore
-    if (peerSet[idB58Str] && peerSet[idB58Str].conn) {
+    let peer = peers.get(idB58Str)
+    if (peer && peer.conn) {
       return
     }
 
-    libp2pNode.dialByPeerInfo(peerInfo, multicodec, gotConn)
+    libp2p.dialByPeerInfo(peerInfo, multicodec, gotConn)
 
     function gotConn (err, conn) {
       if (err) {
@@ -27,43 +28,41 @@ module.exports = (libp2pNode, peerSet, subscriptions) => {
       }
 
       // If already had a dial to me, just add the conn
-      if (peerSet[idB58Str]) {
-        peerSet[idB58Str].conn = conn
+      if (peer) {
+        peer.conn = conn
       } else {
-        peerSet[idB58Str] = {
+        peer = {
           conn: conn,
           peerInfo: peerInfo,
-          topics: []
+          topics: new Set(),
+          stream: null
         }
+        peers.set(idB58Str, peer)
       }
 
-      // TODO change  to pull-pushable
-      const pt1 = new PassThrough()
-      const pt2 = new PassThrough()
-
-      peerSet[idB58Str].stream = pt1
-      pt1.pipe(pt2)
-      const ptPull = toPull.duplex(pt2)
+      peer.stream = new Pushable()
 
       pull(
-        ptPull,
+        peer.stream,
         lp.encode(),
         conn
       )
 
       // Immediately send my own subscriptions to the newly established conn
-      if (subscriptions.length > 0) {
-        const subopts = subscriptions.map((topic) => {
-          return {
+      if (subscriptions.size > 0) {
+        const subs = []
+        for (let topic of subscriptions) {
+          subs.push({
             subscribe: true,
             topicCID: topic
-          }
-        })
+          })
+        }
+
         const rpc = pb.rpc.RPC.encode({
-          subscriptions: subopts
+          subscriptions: subs
         })
 
-        peerSet[idB58Str].stream.write(rpc)
+        peers[idB58Str].stream.push(rpc)
       }
     }
   }
