@@ -1,6 +1,6 @@
 'use strict'
 
-const EventEmitter = require('events').EventEmitter
+const EventEmitter = require('events')
 const TimeCache = require('time-cache')
 const values = require('lodash.values')
 const pull = require('pull-stream')
@@ -18,7 +18,8 @@ const ensureArray = utils.ensureArray
 
 /**
  * PubSubGossip, also known as pubsub-flood or just dumbsub,
- * this implementation of pubsub focused on delivering an API * for Publish/Subscribe, but with no CastTree Forming
+ * this implementation of pubsub focused on delivering an API
+ * for Publish/Subscribe, but with no CastTree Forming
  * (it just floods the network).
  */
 class PubSubGossip extends EventEmitter {
@@ -32,12 +33,25 @@ class PubSubGossip extends EventEmitter {
 
     this.dag = dagService
     this.libp2p = libp2p
+
+    /**
+     * Time based cache for sequence numbers.
+     *
+     * @type {TimeCache}
+     */
     this.cache = new TimeCache()
 
-    // Map of peerIdBase58Str: { conn, topics, peerInfo }
+    /**
+     * Map of peers.
+     *
+     * @type {Map<string, Peer>}
+     */
     this.peers = new Map()
 
-    // List of our subscriptions
+    /**
+     * List of our subscriptions
+     * @type {Set<string>}
+     */
     this.subscriptions = new Set()
 
     const onConnection = this._onConnection.bind(this)
@@ -210,6 +224,14 @@ class PubSubGossip extends EventEmitter {
     this.peers.delete(idB58Str)
   }
 
+  /**
+   * Publish messages to the given topics.
+   *
+   * @param {Array<string>|string} topics
+   * @param {Array<any>|any} messages
+   * @returns {undefined}
+   *
+   */
   publish (topics, messages) {
     log('publish', topics, messages)
 

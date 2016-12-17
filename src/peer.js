@@ -5,9 +5,21 @@
  */
 class Peer {
   constructor (info, conn, topics) {
+    /**
+     * @type {PeerInfo}
+     */
     this.info = info
+    /**
+     * @type {Connection}
+     */
     this.conn = conn
+    /**
+     * @type {Set}
+     */
     this.topics = this.topics || new Set()
+    /**
+     * @type {Pushable}
+     */
     this.stream = null
   }
 
@@ -29,13 +41,20 @@ class Peer {
     return Boolean(this.stream)
   }
 
+  /**
+   * Send a message to this peer.
+   * Throws if there is no `stream` to write to available.
+   *
+   * @param {Buffer} msg
+   * @returns {undefined}
+   */
   write (msg) {
     if (!this.isWritable) {
       const id = this.info.id.toB58String()
       throw new Error('No writable connection to ' + id)
     }
 
-    return this.stream.push(msg)
+    this.stream.push(msg)
   }
 }
 
