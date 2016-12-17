@@ -164,13 +164,11 @@ class PubSubGossip extends EventEmitter {
   _handleRpcSubscriptions (subscriptions, idB58Str) {
     const peer = this.peers.get(idB58Str)
     subscriptions.forEach((subopt) => {
-      log('update subs', subopt.topicCID, peer.info.id.toB58String(), peer.topics)
       if (subopt.subscribe) {
         peer.topics.add(subopt.topicCID)
       } else {
         peer.topics.delete(subopt.topicCID)
       }
-      log('t', peer.topics)
     })
   }
 
