@@ -3,13 +3,13 @@
 'use strict'
 
 const expect = require('chai').expect
-const PeerId = require('peer-id')
-const PeerInfo = require('peer-info')
-const multiaddr = require('multiaddr')
-const Node = require('libp2p-ipfs-nodejs')
 const parallel = require('async/parallel')
+
 const PSG = require('../src')
-const _values = require('lodash.values')
+const utils = require('./utils')
+const first = utils.first
+const createNode = utils.createNode
+const expectSet = utils.expectSet
 
 describe('multiple nodes', () => {
   describe('every peer subscribes to the topic', () => {
@@ -23,34 +23,19 @@ describe('multiple nodes', () => {
 
       before((done) => {
         parallel([
-          (cb) => {
-            spawnPubSubNode((err, node) => {
-              if (err) {
-                return cb(err)
-              }
-              a = node
-              cb()
-            })
-          },
-          (cb) => {
-            spawnPubSubNode((err, node) => {
-              if (err) {
-                return cb(err)
-              }
-              b = node
-              cb()
-            })
-          },
-          (cb) => {
-            spawnPubSubNode((err, node) => {
-              if (err) {
-                return cb(err)
-              }
-              c = node
-              cb()
-            })
+          (cb) => spawnPubSubNode(cb),
+          (cb) => spawnPubSubNode(cb),
+          (cb) => spawnPubSubNode(cb)
+        ], (err, nodes) => {
+          if (err) {
+            return done(err)
           }
-        ], done)
+          a = nodes[0]
+          b = nodes[1]
+          c = nodes[2]
+
+          done()
+        })
       })
 
       after((done) => {
@@ -58,15 +43,9 @@ describe('multiple nodes', () => {
         // before swarm does its dials
         setTimeout(() => {
           parallel([
-            (cb) => {
-              a.libp2p.stop(cb)
-            },
-            (cb) => {
-              b.libp2p.stop(cb)
-            },
-            (cb) => {
-              c.libp2p.stop(cb)
-            }
+            (cb) => a.libp2p.stop(cb),
+            (cb) => b.libp2p.stop(cb),
+            (cb) => c.libp2p.stop(cb)
           ], done)
         }, 1000)
       })
@@ -88,49 +67,48 @@ describe('multiple nodes', () => {
 
       it('subscribe to the topic on node a', (done) => {
         a.ps.subscribe('Z')
-        expect(a.ps.getSubscriptions()).to.eql(['Z'])
+        expectSet(a.ps.subscriptions, ['Z'])
 
         setTimeout(() => {
-          const peersB = _values(b.ps.getPeerSet())
-          expect(peersB.length).to.equal(2)
-          expect(Array.from(peersB[1].topics)).to.eql(['Z'])
+          expect(b.ps.peers.size).to.equal(2)
+          const topics = Array.from(b.ps.peers.values())[1].topics
+          expectSet(topics, ['Z'])
 
-          const peersC = _values(c.ps.getPeerSet())
-          expect(peersC.length).to.equal(1)
-          expect(Array.from(peersC[0].topics)).to.eql([])
+          expect(c.ps.peers.size).to.equal(1)
+          expectSet(first(c.ps.peers).topics, [])
+
           done()
         }, 200)
       })
 
       it('subscribe to the topic on node b', (done) => {
         b.ps.subscribe('Z')
-        expect(b.ps.getSubscriptions()).to.eql(['Z'])
+        expectSet(b.ps.subscriptions, ['Z'])
 
         setTimeout(() => {
-          const peersA = _values(a.ps.getPeerSet())
-          expect(peersA.length).to.equal(1)
-          expect(Array.from(peersA[0].topics)).to.eql(['Z'])
+          expect(a.ps.peers.size).to.equal(1)
+          expectSet(first(a.ps.peers).topics, ['Z'])
 
-          const peersC = _values(c.ps.getPeerSet())
-          expect(peersC.length).to.equal(1)
-          expect(Array.from(peersC[0].topics)).to.eql(['Z'])
+          expect(c.ps.peers.size).to.equal(1)
+          expectSet(first(c.ps.peers).topics, ['Z'])
+
           done()
         }, 200)
       })
 
       it('subscribe to the topic on node c', (done) => {
         c.ps.subscribe('Z')
-        expect(c.ps.getSubscriptions()).to.eql(['Z'])
+        expectSet(c.ps.subscriptions, ['Z'])
 
         setTimeout(() => {
-          const peersA = _values(a.ps.getPeerSet())
-          expect(peersA.length).to.equal(1)
-          expect(Array.from(peersA[0].topics)).to.eql(['Z'])
+          expect(a.ps.peers.size).to.equal(1)
+          expectSet(first(a.ps.peers).topics, ['Z'])
 
-          const peersB = _values(b.ps.getPeerSet())
-          expect(peersB.length).to.equal(2)
-          expect(Array.from(peersB[0].topics)).to.eql(['Z'])
-          expect(Array.from(peersB[1].topics)).to.eql(['Z'])
+          expect(b.ps.peers.size).to.equal(2)
+          b.ps.peers.forEach((peer) => {
+            expectSet(peer.topics, ['Z'])
+          })
+
           done()
         }, 200)
       })
@@ -246,24 +224,14 @@ describe('multiple nodes', () => {
 })
 
 function spawnPubSubNode (callback) {
-  PeerId.create((err, id) => {
-    expect(err).to.not.exist
-    PeerInfo.create(id, (err, peer) => {
-      expect(err).to.not.exist
-      peer.multiaddr.add(multiaddr('/ip4/127.0.0.1/tcp/0'))
-      const node = new Node(peer)
-      let ps
+  createNode('/ip4/127.0.0.1/tcp/0', (err, node) => {
+    if (err) {
+      return callback(err)
+    }
 
-      node.start((err) => {
-        if (err) {
-          return callback(err)
-        }
-        ps = new PSG(node)
-        callback(null, {
-          libp2p: node,
-          ps: ps
-        })
-      })
+    callback(null, {
+      libp2p: node,
+      ps: new PSG(node)
     })
   })
 }

@@ -308,22 +308,6 @@ class PubSubGossip extends EventEmitter {
       }))
     })
   }
-
-  // TODO: remove usage in tests
-  getPeerSet () {
-    let res = {}
-    log('tp', this.peers)
-    this.peers.forEach((val, key) => {
-      log('getPeers', val.topics)
-      res[key] = val
-    })
-    return res
-  }
-
-  // TODO: remove usage in tests
-  getSubscriptions () {
-    return Array.from(this.subscriptions)
-  }
 }
 
 module.exports = PubSubGossip
