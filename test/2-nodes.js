@@ -106,7 +106,7 @@ describe('basics', () => {
       setTimeout(() => {
         expect(psA.getSubscriptions()).to.eql(['Z'])
         const peersB = _values(psB.getPeerSet())
-        expect(peersB.length).to.equal(1)
+        expect(peersB).to.have.length(1)
         expect(Array.from(peersB[0].topics)).to.eql(['Z'])
         done()
       }, 100)
@@ -128,15 +128,13 @@ describe('basics', () => {
       psA.publish('Z', new Buffer('hey'))
     })
 
-    it.skip('Publish to a topic:Z in nodeB', (done) => {
+    it('Publish to a topic:Z in nodeB', (done) => {
       psB.once('Z', shouldNotHappen)
 
       psA.once('Z', (msg) => {
-        console.log('event', msg.toString())
         psA.once('Z', shouldNotHappen)
         expect(msg.toString()).to.equal('banana')
         setTimeout(() => {
-          console.log('removing listeners')
           psA.removeListener('Z', shouldNotHappen)
           psB.removeListener('Z', shouldNotHappen)
           done()
@@ -148,7 +146,7 @@ describe('basics', () => {
       psB.publish('Z', new Buffer('banana'))
     })
 
-    it.skip('Publish 10 msg to a topic:Z in nodeB', (done) => {
+    it('Publish 10 msg to a topic:Z in nodeB', (done) => {
       let counter = 0
 
       psB.once('Z', shouldNotHappen)
@@ -264,7 +262,6 @@ describe('basics', () => {
     })
 
     it('Existing subscriptions are sent upon peer connection', (done) => {
-      console.log(psA.getPeerSet(), psB.getPeerSet())
       nodeA.dialByPeerInfo(nodeB.peerInfo, (err) => {
         expect(err).to.not.exist
         setTimeout(() => {
@@ -274,7 +271,6 @@ describe('basics', () => {
           expect(psA.getSubscriptions()).to.eql(['Za'])
           const peersB = _values(psB.getPeerSet())
           expect(peersB.length).to.equal(1)
-          console.log(psA.getPeerSet(), psB.getPeerSet())
           expect(Array.from(peersB[0].topics)).to.eql(['Za'])
 
           expect(psB.getSubscriptions()).to.eql(['Zb'])
