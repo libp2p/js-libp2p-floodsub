@@ -130,7 +130,6 @@ class FloodSub extends EventEmitter {
   }
 
   _onRpc (idB58Str, rpc) {
-    log('handling', rpc)
     if (!rpc) {
       return
     }
@@ -144,11 +143,11 @@ class FloodSub extends EventEmitter {
     }
 
     if (msgs && msgs.length) {
-      this._handleRpcMessages(rpc.msgs)
+      this._processRpcMessages(rpc.msgs)
     }
   }
 
-  _handleRpcMessages (msgs) {
+  _processRpcMessages (msgs) {
     msgs.forEach((msg) => {
       const seqno = utils.msgId(msg.from, msg.seqno.toString())
       // 1. check if I've seen the message, if yes, ignore
@@ -159,19 +158,10 @@ class FloodSub extends EventEmitter {
       this.cache.put(seqno)
 
       // 2. emit to self
-      msg.topicCIDs.forEach((topic) => {
-        if (this.subscriptions.has(topic)) {
-          this.emit(topic, msg.data)
-        }
-      })
+      this._emitMessages(msg.topicCIDs, [msg.data])
 
       // 3. propagate msg to others
-      this.peers.forEach((peer) => {
-        if (peer.isWritable &&
-            utils.anyMatch(peer.topics, msg.topicCIDs)) {
-          peer.sendMessages([msg])
-        }
-      })
+      this._forwardMessages(msg.topicCIDs, [msg])
     })
   }
 
@@ -182,6 +172,31 @@ class FloodSub extends EventEmitter {
     }
 
     this.peers.delete(idB58Str)
+  }
+
+  _emitMessages (topics, messages) {
+    topics.forEach((topic) => {
+      if (!this.subscriptions.has(topic)) {
+        return
+      }
+
+      messages.forEach((message) => {
+        this.emit(topic, message)
+      })
+    })
+  }
+
+  _forwardMessages (topics, messages) {
+    this.peers.forEach((peer) => {
+      if (!peer.isWritable ||
+          !utils.anyMatch(peer.topics, topics)) {
+        return
+      }
+
+      peer.sendMessages(messages)
+
+      log('publish msgs on topics', topics, peer.info.id.toB58String())
+    })
   }
 
   /**
@@ -199,13 +214,7 @@ class FloodSub extends EventEmitter {
     messages = ensureArray(messages)
 
     // Emit to self if I'm interested
-    topics
-      .filter((topic) => this.subscriptions.has(topic))
-      .forEach((topic) => {
-        messages.forEach((message) => {
-          this.emit(topic, message)
-        })
-      })
+    this._emitMessages(topics, messages)
 
     const from = this.libp2p.peerInfo.id.toB58String()
 
@@ -222,15 +231,7 @@ class FloodSub extends EventEmitter {
     }
 
     // send to all the other peers
-    this.peers.forEach((peer) => {
-      if (!utils.anyMatch(peer.topics, topics)) {
-        return
-      }
-
-      peer.sendMessages(messages.map(buildMessage))
-
-      log('publish msgs on topics', topics, peer.info.id.toB58String())
-    })
+    this._forwardMessages(topics, messages.map(buildMessage))
   }
 
   /**
