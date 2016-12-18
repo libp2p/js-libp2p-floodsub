@@ -7,7 +7,7 @@ exports = module.exports
 /**
  * Generatea random sequence number.
  *
- * @returns {Buffer}
+ * @returns {string}
  * @private
  */
 exports.randomSeqno = () => {

@@ -6,6 +6,19 @@ const expect = require('chai').expect
 const utils = require('../src/utils')
 
 describe('utils', () => {
+  it('randomSeqno', () => {
+    const first = utils.randomSeqno()
+    const second = utils.randomSeqno()
+
+    expect(first).to.have.length(40)
+    expect(second).to.have.length(40)
+    expect(first).to.not.be.eql(second)
+  })
+
+  it('msgId', () => {
+    expect(utils.msgId('hello', 'world')).to.be.eql('helloworld')
+  })
+
   it('anyMatch', () => {
     [
       [[1, 2, 3], [4, 5, 6], false],
