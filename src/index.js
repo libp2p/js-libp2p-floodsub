@@ -5,7 +5,6 @@ const TimeCache = require('time-cache')
 const values = require('lodash.values')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const Pushable = require('pull-pushable')
 
 const Peer = require('./peer')
 const utils = require('./utils')
@@ -22,7 +21,7 @@ const ensureArray = utils.ensureArray
  * for Publish/Subscribe, but with no CastTree Forming
  * (it just floods the network).
  */
-class PubSubGossip extends EventEmitter {
+class FloodSub extends EventEmitter {
   /**
    * @param {Object} libp2p
    * @param {Object} dagService
@@ -91,40 +90,15 @@ class PubSubGossip extends EventEmitter {
     const idB58Str = peerInfo.id.toB58String()
 
     // If already had a dial to me, just add the conn
-    let peer = this.peers.get(idB58Str)
-    if (peer) {
-      peer.conn = conn
-    } else {
-      this.peers.set(idB58Str, new Peer(peerInfo, conn))
-      peer = this.peers.get(idB58Str)
+    if (!this.peers.has(idB58Str)) {
+      this.peers.set(idB58Str, new Peer(peerInfo))
     }
 
-    peer.stream = new Pushable()
-
-    pull(
-      peer.stream,
-      lp.encode(),
-      conn
-    )
+    const peer = this.peers.get(idB58Str)
+    peer.attachConnection(conn)
 
     // Immediately send my own subscriptions to the newly established conn
-    if (this.subscriptions.size > 0 && peer.stream) {
-      this._sendSubscriptions(peer)
-    }
-  }
-
-  _sendSubscriptions (peer) {
-    const subs = []
-    this.subscriptions.forEach((topic) => {
-      subs.push({
-        subscribe: true,
-        topicCID: topic
-      })
-    })
-
-    peer.write(pb.rpc.RPC.encode({
-      subscriptions: subs
-    }))
+    peer.sendSubscriptions(this.subscriptions)
   }
 
   _onConnection (protocol, conn) {
@@ -167,23 +141,13 @@ class PubSubGossip extends EventEmitter {
     const msgs = rpc.msgs
 
     if (subs && subs.length) {
-      this._handleRpcSubscriptions(rpc.subscriptions, idB58Str)
+      const peer = this.peers.get(idB58Str)
+      peer.updateSubscriptions(subs)
     }
 
     if (msgs && msgs.length) {
       this._handleRpcMessages(rpc.msgs)
     }
-  }
-
-  _handleRpcSubscriptions (subscriptions, idB58Str) {
-    const peer = this.peers.get(idB58Str)
-    subscriptions.forEach((subopt) => {
-      if (subopt.subscribe) {
-        peer.topics.add(subopt.topicCID)
-      } else {
-        peer.topics.delete(subopt.topicCID)
-      }
-    })
   }
 
   _handleRpcMessages (msgs) {
@@ -207,9 +171,7 @@ class PubSubGossip extends EventEmitter {
       this.peers.forEach((peer) => {
         if (peer.isWritable &&
             utils.anyMatch(peer.topics, msg.topicCIDs)) {
-          peer.write(pb.rpc.RPC.encode({
-            msgs: [msg]
-          }))
+          peer.sendMessages([msg])
         }
       })
     })
@@ -267,9 +229,7 @@ class PubSubGossip extends EventEmitter {
         return
       }
 
-      peer.write(pb.rpc.RPC.encode({
-        msgs: messages.map(buildMessage)
-      }))
+      peer.sendMessages(messages.map(buildMessage))
 
       log('publish msgs on topics', topics, peer.info.id.toB58String())
     })
@@ -288,17 +248,8 @@ class PubSubGossip extends EventEmitter {
       this.subscriptions.add(topic)
     })
 
-    const buildSubscription = (topic) => {
-      return {
-        subscribe: true,
-        topicCID: topic
-      }
-    }
-
     this.peers.forEach((peer) => {
-      peer.write(pb.rpc.RPC.encode({
-        subscriptions: topics.map(buildSubscription)
-      }))
+      peer.sendSubscriptions(topics)
     })
   }
 
@@ -315,19 +266,10 @@ class PubSubGossip extends EventEmitter {
       this.subscriptions.delete(topic)
     })
 
-    const buildUnsubscription = (topic) => {
-      return {
-        subscribe: false,
-        topicCID: topic
-      }
-    }
-
     this.peers.forEach((peer) => {
-      peer.write(pb.rpc.RPC.encode({
-        subscriptions: topics.map(buildUnsubscription)
-      }))
+      peer.sendUnsubscriptions(topics)
     })
   }
 }
 
-module.exports = PubSubGossip
+module.exports = FloodSub

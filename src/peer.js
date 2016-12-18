@@ -1,10 +1,19 @@
 'use strict'
 
+const lp = require('pull-length-prefixed')
+const Pushable = require('pull-pushable')
+const pull = require('pull-stream')
+
+const rpc = require('./message').rpc.RPC
+
 /**
  * The known state of a connected peer.
  */
 class Peer {
-  constructor (info, conn, topics) {
+  /**
+   * @param {PeerInfo} info
+   */
+  constructor (info) {
     /**
      * @type {PeerInfo}
      */
@@ -12,11 +21,11 @@ class Peer {
     /**
      * @type {Connection}
      */
-    this.conn = conn
+    this.conn = null
     /**
      * @type {Set}
      */
-    this.topics = this.topics || new Set()
+    this.topics = new Set()
     /**
      * @type {Pushable}
      */
@@ -55,6 +64,87 @@ class Peer {
     }
 
     this.stream.push(msg)
+  }
+
+  /**
+   * Attach the peer to a connection and setup a write stream
+   *
+   * @param {Connection} conn
+   * @returns {undefined}
+   */
+  attachConnection (conn) {
+    this.conn = conn
+    this.stream = new Pushable()
+
+    pull(
+      this.stream,
+      lp.encode(),
+      conn
+    )
+  }
+
+  _sendRawSubscriptions (topics, subscribe) {
+    if (topics.size === 0) {
+      return
+    }
+
+    const subs = []
+    topics.forEach((topic) => {
+      subs.push({
+        subscribe: subscribe,
+        topicCID: topic
+      })
+    })
+
+    this.write(rpc.encode({
+      subscriptions: subs
+    }))
+  }
+
+  /**
+   * Send the given subscriptions to this peer.
+   * @param {Set|Array} topics
+   * @returns {undefined}
+   */
+  sendSubscriptions (topics) {
+    this._sendRawSubscriptions(topics, true)
+  }
+
+  /**
+   * Send the given unsubscriptions to this peer.
+   * @param {Set|Array} topics
+   * @returns {undefined}
+   */
+  sendUnsubscriptions (topics) {
+    this._sendRawSubscriptions(topics, false)
+  }
+
+  /**
+   * Send messages to this peer.
+   *
+   * @param {Array<any>} msgs
+   * @returns {undefined}
+   */
+  sendMessages (msgs) {
+    this.write(rpc.encode({
+      msgs: msgs
+    }))
+  }
+
+  /**
+   * Bulk process subscription updates.
+   *
+   * @param {Array} changes
+   * @returns {undefined}
+   */
+  updateSubscriptions (changes) {
+    changes.forEach((subopt) => {
+      if (subopt.subscribe) {
+        this.topics.add(subopt.topicCID)
+      } else {
+        this.topics.delete(subopt.topicCID)
+      }
+    })
   }
 }
 
