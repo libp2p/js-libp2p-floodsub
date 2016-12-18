@@ -24,13 +24,11 @@ const ensureArray = utils.ensureArray
 class FloodSub extends EventEmitter {
   /**
    * @param {Object} libp2p
-   * @param {Object} dagService
    * @returns {PubSubGossip}
    */
-  constructor (libp2p, dagService) {
+  constructor (libp2p) {
     super()
 
-    this.dag = dagService
     this.libp2p = libp2p
 
     /**
