@@ -55,8 +55,8 @@
   },
   "dependencies": {
     "debug": "^2.4.5",
-    "git-sha1": "^0.1.2",
     "length-prefixed-stream": "^1.5.1",
+    "libp2p-crypto": "^0.7.5",
     "lodash.values": "^4.3.0",
     "pull-pushable": "^2.0.1",
     "time-cache": "^0.3.0"

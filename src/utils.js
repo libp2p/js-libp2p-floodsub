@@ -1,6 +1,6 @@
 'use strict'
 
-const sha1 = require('git-sha1')
+const crypto = require('libp2p-crypto')
 
 exports = module.exports
 
@@ -11,7 +11,7 @@ exports = module.exports
  * @private
  */
 exports.randomSeqno = () => {
-  return sha1((~~(Math.random() * 1e9)).toString(36) + Date.now())
+  return crypto.randomBytes(20).toString('hex')
 }
 
 /**
