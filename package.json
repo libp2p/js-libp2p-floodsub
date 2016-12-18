@@ -44,6 +44,7 @@
   "devDependencies": {
     "aegir": "^9.3.0",
     "async": "^2.1.4",
+    "benchmark": "^2.1.2",
     "chai": "^3.5.0",
     "libp2p-ipfs-nodejs": "^0.17.0",
     "lodash.times": "^4.3.2",
