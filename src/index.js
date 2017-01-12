@@ -257,7 +257,7 @@ class FloodSub extends EventEmitter {
    * @returns {undefined}
    *
    */
-  publish (topics, messages) {
+  publish (topics, messages, callback) {
     assert(this.started, 'FloodSub is not started')
 
     log('publish', topics, messages)
@@ -286,6 +286,8 @@ class FloodSub extends EventEmitter {
 
     // send to all the other peers
     this._forwardMessages(topics, messages.map(buildMessage))
+
+    setImmediate(() => callback)
   }
 
   /**
