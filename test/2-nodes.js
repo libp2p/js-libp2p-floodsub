@@ -165,6 +165,26 @@ describe('basics between 2 nodes', () => {
       fsA.publish('Z', new Buffer('banana'))
     })
 
+    it('Last value cache', (done) => {
+      fsA.subscribe('P')
+      fsA.once('P', (msg) => {
+        expect(msg.data.toString()).to.eql('hello')
+
+        // we subscribe after the first submission
+        fsB.once('P', (msg2) => {
+          expect(msg2.data.toString()).to.eql('hello')
+
+          fsA.unsubscribe('P')
+          fsB.unsubscribe('P')
+          done()
+        })
+
+        fsB.subscribe('P')
+      })
+
+      fsB.publish('P', new Buffer('hello'))
+    })
+
     it('stop both FloodSubs', (done) => {
       parallel([
         (cb) => fsA.stop(cb),

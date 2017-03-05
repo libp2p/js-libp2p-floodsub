@@ -53,6 +53,13 @@ class FloodSub extends EventEmitter {
      */
     this.subscriptions = new Set()
 
+    /**
+     * Cache for the last message on seen subscriptions
+     * @type {Map<string, Buffer>}
+     * @private
+     */
+    this._lvc = new Map()
+
     this._onConnection = this._onConnection.bind(this)
     this._dialPeer = this._dialPeer.bind(this)
   }
@@ -134,6 +141,20 @@ class FloodSub extends EventEmitter {
     if (subs && subs.length) {
       const peer = this.peers.get(idB58Str)
       peer.updateSubscriptions(subs)
+
+      subs.forEach((sub) => {
+        if (!sub.subscribe) {
+          return
+        }
+        const topic = sub.topicCID
+
+        if (this._lvc.has(topic)) {
+          const msg = this._lvc.get(topic)
+          this.peers.forEach((peer) => {
+            peer.sendMessages([msg])
+          })
+        }
+      })
     }
 
     if (msgs && msgs.length) {
@@ -180,7 +201,17 @@ class FloodSub extends EventEmitter {
     })
   }
 
+  _cacheMessages (topics, messages) {
+    const msg = messages[messages.length - 1]
+
+    topics.forEach((topic) => {
+      this._lvc.set(topic, msg)
+    })
+  }
+
   _forwardMessages (topics, messages) {
+    this._cacheMessages(topics, messages)
+
     this.peers.forEach((peer) => {
       if (!peer.isWritable ||
           !utils.anyMatch(peer.topics, topics)) {
@@ -301,6 +332,10 @@ class FloodSub extends EventEmitter {
 
     topics.forEach((topic) => {
       this.subscriptions.add(topic)
+
+      if (this._lvc.has(topic)) {
+        this.emit(topic, this._lvc.get(topic))
+      }
     })
 
     this.peers.forEach((peer) => {

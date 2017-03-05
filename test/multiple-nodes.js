@@ -20,9 +20,12 @@ describe('multiple nodes (more than 2)', () => {
       let a
       let b
       let c
+      // only used for last value cache test
+      let d
 
       before((done) => {
         parallel([
+          (cb) => spawnPubSubNode(cb),
           (cb) => spawnPubSubNode(cb),
           (cb) => spawnPubSubNode(cb),
           (cb) => spawnPubSubNode(cb)
@@ -33,6 +36,7 @@ describe('multiple nodes (more than 2)', () => {
           a = nodes[0]
           b = nodes[1]
           c = nodes[2]
+          d = nodes[3]
 
           done()
         })
@@ -45,7 +49,8 @@ describe('multiple nodes (more than 2)', () => {
           parallel([
             (cb) => a.libp2p.stop(cb),
             (cb) => b.libp2p.stop(cb),
-            (cb) => c.libp2p.stop(cb)
+            (cb) => c.libp2p.stop(cb),
+            (cb) => d.libp2p.stop(cb)
           ], done)
         }, 1000)
       })
@@ -168,6 +173,19 @@ describe('multiple nodes (more than 2)', () => {
               done()
             }
           }
+        })
+
+        it('last value cache', (done) => {
+          d.libp2p.dialByPeerInfo(b.libp2p.peerInfo, (err) => {
+            expect(err).to.not.exist
+            setTimeout(() => {
+              d.ps.subscribe('Z')
+              d.ps.once('Z', (msg) => {
+                expect(msg.data.toString()).to.eql('hey')
+                done()
+              })
+            }, 200)
+          })
         })
       })
     })
