@@ -56,6 +56,7 @@
   },
   "dependencies": {
     "debug": "^2.6.0",
+    "hashlru": "^2.0.0",
     "length-prefixed-stream": "^1.5.1",
     "libp2p-crypto": "~0.8.1",
     "lodash.values": "^4.3.0",

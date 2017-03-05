@@ -7,6 +7,7 @@ const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const assert = require('assert')
 const asyncEach = require('async/each')
+const HashLru = require('hashlru')
 
 const Peer = require('./peer')
 const utils = require('./utils')
@@ -53,12 +54,8 @@ class FloodSub extends EventEmitter {
      */
     this.subscriptions = new Set()
 
-    /**
-     * Cache for the last message on seen subscriptions
-     * @type {Map<string, Buffer>}
-     * @private
-     */
-    this._lvc = new Map()
+    // Cache for the last message on seen subscriptions
+    this._lvc = new HashLru(256)
 
     this._onConnection = this._onConnection.bind(this)
     this._dialPeer = this._dialPeer.bind(this)
@@ -148,8 +145,8 @@ class FloodSub extends EventEmitter {
         }
         const topic = sub.topicCID
 
-        if (this._lvc.has(topic)) {
-          const msg = this._lvc.get(topic)
+        const msg = this._lvc.get(topic)
+        if (msg) {
           this.peers.forEach((peer) => {
             peer.sendMessages([msg])
           })
@@ -333,8 +330,9 @@ class FloodSub extends EventEmitter {
     topics.forEach((topic) => {
       this.subscriptions.add(topic)
 
-      if (this._lvc.has(topic)) {
-        this.emit(topic, this._lvc.get(topic))
+      const msg = this._lvc.get(topic)
+      if (msg) {
+        this.emit(topic, msg)
       }
     })
 
