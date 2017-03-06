@@ -148,7 +148,7 @@ class FloodSub extends EventEmitter {
         const msg = this._lvc.get(topic)
         if (msg) {
           this.peers.forEach((peer) => {
-            peer.sendMessages([msg])
+            this._sendSafeMessages(peer, [topic], [msg])
           })
         }
       })
@@ -210,15 +210,19 @@ class FloodSub extends EventEmitter {
     this._cacheMessages(topics, messages)
 
     this.peers.forEach((peer) => {
-      if (!peer.isWritable ||
-          !utils.anyMatch(peer.topics, topics)) {
-        return
-      }
-
-      peer.sendMessages(messages)
-
-      log('publish msgs on topics', topics, peer.info.id.toB58String())
+      this._sendSafeMessages(peer, topics, messages)
     })
+  }
+
+  _sendSafeMessages (peer, topics, messages) {
+    if (!peer.isWritable ||
+        !utils.anyMatch(peer.topics, topics)) {
+      return
+    }
+
+    peer.sendMessages(messages)
+
+    log('publish msgs on topics', topics, peer.info.id.toB58String())
   }
 
   /**
