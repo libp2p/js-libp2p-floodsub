@@ -7,6 +7,7 @@ const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const assert = require('assert')
 const asyncEach = require('async/each')
+const HashLru = require('hashlru')
 
 const Peer = require('./peer')
 const utils = require('./utils')
@@ -52,6 +53,9 @@ class FloodSub extends EventEmitter {
      * @type {Set<string>}
      */
     this.subscriptions = new Set()
+
+    // Cache for the last message on seen subscriptions
+    this._lvc = new HashLru(256)
 
     this._onConnection = this._onConnection.bind(this)
     this._dialPeer = this._dialPeer.bind(this)
@@ -134,6 +138,20 @@ class FloodSub extends EventEmitter {
     if (subs && subs.length) {
       const peer = this.peers.get(idB58Str)
       peer.updateSubscriptions(subs)
+
+      subs.forEach((sub) => {
+        if (!sub.subscribe) {
+          return
+        }
+        const topic = sub.topicCID
+
+        const msg = this._lvc.get(topic)
+        if (msg) {
+          this.peers.forEach((peer) => {
+            this._sendSafeMessages(peer, [topic], [msg])
+          })
+        }
+      })
     }
 
     if (msgs && msgs.length) {
@@ -180,17 +198,31 @@ class FloodSub extends EventEmitter {
     })
   }
 
-  _forwardMessages (topics, messages) {
-    this.peers.forEach((peer) => {
-      if (!peer.isWritable ||
-          !utils.anyMatch(peer.topics, topics)) {
-        return
-      }
+  _cacheMessages (topics, messages) {
+    const msg = messages[messages.length - 1]
 
-      peer.sendMessages(messages)
-
-      log('publish msgs on topics', topics, peer.info.id.toB58String())
+    topics.forEach((topic) => {
+      this._lvc.set(topic, msg)
     })
+  }
+
+  _forwardMessages (topics, messages) {
+    this._cacheMessages(topics, messages)
+
+    this.peers.forEach((peer) => {
+      this._sendSafeMessages(peer, topics, messages)
+    })
+  }
+
+  _sendSafeMessages (peer, topics, messages) {
+    if (!peer.isWritable ||
+        !utils.anyMatch(peer.topics, topics)) {
+      return
+    }
+
+    peer.sendMessages(messages)
+
+    log('publish msgs on topics', topics, peer.info.id.toB58String())
   }
 
   /**
@@ -301,6 +333,11 @@ class FloodSub extends EventEmitter {
 
     topics.forEach((topic) => {
       this.subscriptions.add(topic)
+
+      const msg = this._lvc.get(topic)
+      if (msg) {
+        this.emit(topic, msg)
+      }
     })
 
     this.peers.forEach((peer) => {
