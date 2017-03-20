@@ -93,7 +93,7 @@ class FloodSub extends EventEmitter {
     peer.attachConnection(conn)
 
     // Immediately send my own subscriptions to the newly established conn
-    peer.sendSubscriptions(this.subscriptions)
+    setImmediate(() => peer.sendSubscriptions(this.subscriptions))
     setImmediate(() => callback())
   }
 
@@ -137,21 +137,24 @@ class FloodSub extends EventEmitter {
 
     if (subs && subs.length) {
       const peer = this.peers.get(idB58Str)
-      peer.updateSubscriptions(subs)
 
-      subs.forEach((sub) => {
-        if (!sub.subscribe) {
-          return
-        }
-        const topic = sub.topicCID
+      if (peer) {
+        peer.updateSubscriptions(subs)
 
-        const msg = this._lvc.get(topic)
-        if (msg) {
-          this.peers.forEach((peer) => {
-            this._sendSafeMessages(peer, [topic], [msg])
-          })
-        }
-      })
+        subs.forEach((sub) => {
+          if (!sub.subscribe) {
+            return
+          }
+          const topic = sub.topicCID
+
+          const msg = this._lvc.get(topic)
+          if (msg) {
+            this.peers.forEach((peer) => {
+              this._sendSafeMessages(peer, [topic], [msg])
+            })
+          }
+        })
+      }
     }
 
     if (msgs && msgs.length) {
@@ -362,6 +365,8 @@ class FloodSub extends EventEmitter {
     this.peers.forEach((peer) => {
       peer.sendUnsubscriptions(topics)
     })
+
+    this.cache = new TimeCache()
   }
 }
 
