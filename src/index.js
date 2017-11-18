@@ -131,6 +131,7 @@ class FloodSub extends EventEmitter {
       return
     }
 
+    log('rpc from', idB58Str, rpc)
     const subs = rpc.subscriptions
     const msgs = rpc.msgs
 
@@ -157,10 +158,10 @@ class FloodSub extends EventEmitter {
       this.cache.put(seqno)
 
       // 2. emit to self
-      this._emitMessages(msg.topicIDs, [msg])
+      this._emitMessages(msg.topicCIDs, [msg])
 
       // 3. propagate msg to others
-      this._forwardMessages(msg.topicIDs, [msg])
+      this._forwardMessages(msg.topicCIDs, [msg])
     })
   }
 
@@ -170,6 +171,7 @@ class FloodSub extends EventEmitter {
       log.err(err)
     }
 
+    log('connection ended', idB58Str)
     this.peers.delete(idB58Str)
   }
 
@@ -180,13 +182,22 @@ class FloodSub extends EventEmitter {
       }
 
       messages.forEach((message) => {
-        this.emit(topic, message)
+        // Convert RPC message to API message
+        const m = {
+          from: message.from,
+          data: message.data,
+          seqno: message.seqno,
+          topicIDs: message.topicCIDs
+        }
+        this.emit(topic, m)
       })
     })
   }
 
   _forwardMessages (topics, messages) {
+    log('forwarding to', this.peers)
     this.peers.forEach((peer) => {
+    log('forward to peer', peer)
       if (!peer.isWritable || !utils.anyMatch(peer.topics, topics)) {
         return
       }
@@ -218,12 +229,13 @@ class FloodSub extends EventEmitter {
     // Dial already connected peers
     const peerInfos = values(this.libp2p.peerBook.getAll())
 
-    console.log('peerInfos', peerInfos)
-    this.started = true
-    setImmediate(() => callback())
-    
-    asyncEach(peerInfos, (peer, cb) => this._dialPeer(peer, cb), () => { })
-  }
+    asyncEach(peerInfos, (peer, cb) => this._dialPeer(peer, cb), (err) => {
+      setImmediate(() => {
+        this.started = true
+        callback(err)
+      })
+    })
+ }
 
   /**
    * Unmounts the floodsub protocol and shuts down every connection
@@ -276,7 +288,7 @@ class FloodSub extends EventEmitter {
         from: from,
         data: msg,
         seqno: new Buffer(seqno),
-        topicIDs: topics
+        topicCIDs: topics
       }
     }
 
@@ -286,7 +298,7 @@ class FloodSub extends EventEmitter {
     this._emitMessages(topics, msgObjects)
 
     // send to all the other peers
-    this._forwardMessages(topics, messages.map(buildMessage))
+    this._forwardMessages(topics, msgObjects)
   }
 
   /**
