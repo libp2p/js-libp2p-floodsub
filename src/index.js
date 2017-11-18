@@ -218,12 +218,11 @@ class FloodSub extends EventEmitter {
     // Dial already connected peers
     const peerInfos = values(this.libp2p.peerBook.getAll())
 
-    asyncEach(peerInfos, (peer, cb) => this._dialPeer(peer, cb), (err) => {
-      setImmediate(() => {
-        this.started = true
-        callback(err)
-      })
-    })
+    console.log('peerInfos', peerInfos)
+    this.started = true
+    setImmediate(() => callback())
+    
+    asyncEach(peerInfos, (peer, cb) => this._dialPeer(peer, cb), () => { })
   }
 
   /**
