@@ -93,6 +93,7 @@ class FloodSub extends EventEmitter {
     peer.attachConnection(conn)
 
     // Immediately send my own subscriptions to the newly established conn
+    console.log('subs', this.subscriptions)
     peer.sendSubscriptions(this.subscriptions)
     setImmediate(() => callback())
   }
@@ -173,11 +174,11 @@ class FloodSub extends EventEmitter {
     }
 
     log('connection ended', idB58Str)
-    const peer = this.peers.get(idB58Str)
-    if (peer && peer.conn === conn) {
+    //const peer = this.peers.get(idB58Str)
+    //if (peer && (peer.conn === null || peer.conn === conn)) {
       log('delete peer', idB58Str)
       this.peers.delete(idB58Str)
-    }
+    //}
   }
 
   _emitMessages (topics, messages) {
@@ -260,6 +261,7 @@ class FloodSub extends EventEmitter {
         return callback(err)
       }
       this.peers = new Map()
+      this.subscriptions = new Set()
       this.started = false
       callback()
     })
