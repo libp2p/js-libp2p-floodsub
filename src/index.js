@@ -82,7 +82,8 @@ class FloodSub extends EventEmitter {
 
   _onDial (peerInfo, conn, callback) {
     const idB58Str = peerInfo.id.toB58String()
-
+    log('connected', idB58Str)
+    
     // If already had a dial to me, just add the conn
     if (!this.peers.has(idB58Str)) {
       this.peers.set(idB58Str, new Peer(peerInfo))
@@ -121,7 +122,7 @@ class FloodSub extends EventEmitter {
       pull.map((data) => pb.rpc.RPC.decode(data)),
       pull.drain(
         (rpc) => this._onRpc(idB58Str, rpc),
-        (err) => this._onConnectionEnd(idB58Str, err)
+        (err) => this._onConnectionEnd(idB58Str, conn, err)
       )
     )
   }
@@ -165,14 +166,19 @@ class FloodSub extends EventEmitter {
     })
   }
 
-  _onConnectionEnd (idB58Str, err) {
+  _onConnectionEnd (idB58Str, conn, err) {
     // socket hang up, means the one side canceled
     if (err && err.message !== 'socket hang up') {
       log.err(err)
     }
 
     log('connection ended', idB58Str)
-    this.peers.delete(idB58Str)
+    const peer = this.peers.get(idB58Str)
+    if (peer && peer.conn === conn) {
+      log('delete peer', idB58Str)
+      this.peers.delete(idB58Str)
+    }
+    
   }
 
   _emitMessages (topics, messages) {
