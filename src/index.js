@@ -83,7 +83,7 @@ class FloodSub extends EventEmitter {
   _onDial (peerInfo, conn, callback) {
     const idB58Str = peerInfo.id.toB58String()
     log('connected', idB58Str)
-    
+
     // If already had a dial to me, just add the conn
     if (!this.peers.has(idB58Str)) {
       this.peers.set(idB58Str, new Peer(peerInfo))
@@ -178,7 +178,6 @@ class FloodSub extends EventEmitter {
       log('delete peer', idB58Str)
       this.peers.delete(idB58Str)
     }
-    
   }
 
   _emitMessages (topics, messages) {
@@ -239,7 +238,7 @@ class FloodSub extends EventEmitter {
         callback(err)
       })
     })
- }
+  }
 
   /**
    * Unmounts the floodsub protocol and shuts down every connection
@@ -338,7 +337,7 @@ class FloodSub extends EventEmitter {
   unsubscribe (topics) {
     // Avoid race conditions, by quietly ignoring unsub when shutdown.
     if (!this.started) {
-      return;
+      return
     }
 
     topics = ensureArray(topics)
