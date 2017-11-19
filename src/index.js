@@ -173,11 +173,11 @@ class FloodSub extends EventEmitter {
     }
 
     log('connection ended', idB58Str)
-    //const peer = this.peers.get(idB58Str)
-    //if (peer && (peer.conn === null || peer.conn === conn)) {
-      log('delete peer', idB58Str)
-      this.peers.delete(idB58Str)
-    //}
+    // const peer = this.peers.get(idB58Str)
+    // if (peer && (peer.conn === null || peer.conn === conn)) {
+    log('delete peer', idB58Str)
+    this.peers.delete(idB58Str)
+    // }
   }
 
   _emitMessages (topics, messages) {

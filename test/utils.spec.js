@@ -51,7 +51,7 @@ describe('utils', () => {
     const expected = [
       { from: stringId },
       { from: stringId }
-    ];
+    ]
     expect(utils.normalizeInRpcMessages(m)).to.deep.eql(expected)
   })
 
@@ -65,7 +65,7 @@ describe('utils', () => {
     const expected = [
       { from: binaryId },
       { from: binaryId }
-    ];
+    ]
     expect(utils.normalizeOutRpcMessages(m)).to.deep.eql(expected)
   })
 })

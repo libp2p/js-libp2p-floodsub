@@ -70,26 +70,26 @@ exports.ensureArray = (maybeArray) => {
 
 exports.normalizeInRpcMessages = (messages) => {
   if (!messages) {
-    return messages;
+    return messages
   }
   return messages.map((msg) => {
     const m = Object.assign({}, msg)
     if (Buffer.isBuffer(msg.from)) {
       m.from = bs58.encode(msg.from)
     }
-    return m;
+    return m
   })
 }
 
 exports.normalizeOutRpcMessages = (messages) => {
   if (!messages) {
-    return messages;
+    return messages
   }
   return messages.map((msg) => {
     const m = Object.assign({}, msg)
     if (typeof msg.from === 'string' || msg.from instanceof String) {
       m.from = bs58.decode(msg.from)
     }
-    return m;
+    return m
   })
 }
