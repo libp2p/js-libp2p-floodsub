@@ -155,9 +155,6 @@ class Peer {
    * @returns {undefined}
    */
   close (callback) {
-    if (!this.conn || !this.stream) {
-      // no connection to close
-    }
     // end the pushable pull-stream
     if (this.stream) {
       this.stream.end()
