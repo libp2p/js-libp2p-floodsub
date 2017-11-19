@@ -93,7 +93,6 @@ class FloodSub extends EventEmitter {
     peer.attachConnection(conn)
 
     // Immediately send my own subscriptions to the newly established conn
-    console.log('subs', this.subscriptions)
     peer.sendSubscriptions(this.subscriptions)
     setImmediate(() => callback())
   }
@@ -138,7 +137,7 @@ class FloodSub extends EventEmitter {
     const msgs = rpc.msgs
 
     if (msgs && msgs.length) {
-      this._processRpcMessages(rpc.msgs)
+      this._processRpcMessages(utils.normalizeInRpcMessages(rpc.msgs))
     }
 
     if (subs && subs.length) {
@@ -206,7 +205,7 @@ class FloodSub extends EventEmitter {
         return
       }
 
-      peer.sendMessages(messages)
+      peer.sendMessages(utils.normalizeOutRpcMessages(messages))
 
       log('publish msgs on topics', topics, peer.info.id.toB58String())
     })
