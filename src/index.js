@@ -62,7 +62,6 @@ class FloodSub extends EventEmitter {
   _dialPeer (peerInfo, callback) {
     callback = callback || function noop () {}
     const idB58Str = peerInfo.id.toB58String()
-    log('dialing %s', idB58Str)
 
     // If already have a PubSub conn, ignore
     const peer = this.peers.get(idB58Str)
@@ -70,6 +69,7 @@ class FloodSub extends EventEmitter {
       return setImmediate(() => callback())
     }
 
+    log('dialing %s', idB58Str)
     this.libp2p.dial(peerInfo, multicodec, (err, conn) => {
       if (err) {
         log.err(err)
@@ -195,9 +195,7 @@ class FloodSub extends EventEmitter {
   }
 
   _forwardMessages (topics, messages) {
-    log('forwarding to', this.peers)
     this.peers.forEach((peer) => {
-    log('forward to peer', peer)
       if (!peer.isWritable || !utils.anyMatch(peer.topics, topics)) {
         return
       }
@@ -332,7 +330,11 @@ class FloodSub extends EventEmitter {
    * @returns {undefined}
    */
   unsubscribe (topics) {
-    assert(this.started, 'FloodSub is not started')
+    // Avoid race conditions, by quietly ignoring unsub when shutdown.
+    if (!this.started) {
+      return;
+    }
+
     topics = ensureArray(topics)
 
     topics.forEach((topic) => this.subscriptions.delete(topic))
