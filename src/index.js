@@ -62,9 +62,15 @@ class FloodSub extends EventEmitter {
   _addPeer (peer) {
     const id = peer.info.id.toB58String()
 
-    // Always use an existing peer.
+    /*
+      Always use an existing peer.
+      
+      What is happening here is: "If the other peer has already dialed to me, we already have 
+      an establish link between the two, what might be missing is a 
+      Connection specifically between me and that Peer"
+     */
     let existing = this.peers.get(id)
-    if (existing !== undefined) {
+    if (existing) {
       log('already existing peer', id)
       ++existing._references
     } else {
