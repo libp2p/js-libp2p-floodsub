@@ -287,7 +287,7 @@ describe('basics between 2 nodes', () => {
       ], done)
     })
 
-    it('peer is removed from the state when connection ends', (done) => {
+    it.skip('peer is removed from the state when connection ends', (done) => {
       nodeA.dial(nodeB.peerInfo, (err) => {
         expect(err).to.not.exist()
         setTimeout(() => {
