@@ -158,7 +158,7 @@ class Peer {
    */
   close (callback) {
     // Force removal of peer
-    this._references = 1;
+    this._references = 1
 
     // End the pushable
     if (this.stream) {

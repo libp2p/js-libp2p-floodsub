@@ -66,9 +66,8 @@ class FloodSub extends EventEmitter {
     let existing = this.peers.get(id)
     if (existing !== undefined) {
       log('already existing peer', id)
-      ++existing._references;
-    }
-    else {
+      ++existing._references
+    } else {
       log('new peer', id)
       this.peers.set(id, peer)
       existing = peer
@@ -193,7 +192,6 @@ class FloodSub extends EventEmitter {
     if (err && err.message !== 'socket hang up') {
       log.err(err)
     }
-
 
     log('connection ended', idB58Str, err ? err.message : '')
     this._removePeer(peer)
