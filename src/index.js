@@ -59,6 +59,37 @@ class FloodSub extends EventEmitter {
     this._dialPeer = this._dialPeer.bind(this)
   }
 
+  _addPeer (peer) {
+    const id = peer.info.id.toB58String()
+
+    // Always use an existing peer.
+    let existing = this.peers.get(id)
+    if (existing !== undefined) {
+      log('already existing peer', id)
+      ++existing._references;
+    }
+    else {
+      log('new peer', id)
+      this.peers.set(id, peer)
+      existing = peer
+    }
+
+    return existing
+  }
+
+  _removePeer (peer) {
+    const id = peer.info.id.toB58String()
+
+    log('remove', id, peer._references)
+    // Only delete when no one else is referencing this peer.
+    if (--peer._references === 0) {
+      log('delete peer', id)
+      this.peers.delete(id)
+    }
+
+    return peer
+  }
+
   _dialPeer (peerInfo, callback) {
     callback = callback || function noop () {}
     const idB58Str = peerInfo.id.toB58String()
@@ -84,12 +115,7 @@ class FloodSub extends EventEmitter {
     const idB58Str = peerInfo.id.toB58String()
     log('connected', idB58Str)
 
-    // If already had a dial to me, just add the conn
-    if (!this.peers.has(idB58Str)) {
-      this.peers.set(idB58Str, new Peer(peerInfo))
-    }
-
-    const peer = this.peers.get(idB58Str)
+    const peer = this._addPeer(new Peer(peerInfo))
     peer.attachConnection(conn)
 
     // Immediately send my own subscriptions to the newly established conn
@@ -105,24 +131,20 @@ class FloodSub extends EventEmitter {
       }
 
       const idB58Str = peerInfo.id.toB58String()
+      const peer = this._addPeer(new Peer(peerInfo))
 
-      if (!this.peers.has(idB58Str)) {
-        log('new peer', idB58Str)
-        this.peers.set(idB58Str, new Peer(peerInfo))
-      }
-
-      this._processConnection(idB58Str, conn)
+      this._processConnection(idB58Str, conn, peer)
     })
   }
 
-  _processConnection (idB58Str, conn) {
+  _processConnection (idB58Str, conn, peer) {
     pull(
       conn,
       lp.decode(),
       pull.map((data) => pb.rpc.RPC.decode(data)),
       pull.drain(
         (rpc) => this._onRpc(idB58Str, rpc),
-        (err) => this._onConnectionEnd(idB58Str, conn, err)
+        (err) => this._onConnectionEnd(idB58Str, peer, err)
       )
     )
   }
@@ -132,7 +154,7 @@ class FloodSub extends EventEmitter {
       return
     }
 
-    log('rpc from', idB58Str, rpc)
+    log('rpc from', idB58Str)
     const subs = rpc.subscriptions
     const msgs = rpc.msgs
 
@@ -166,18 +188,15 @@ class FloodSub extends EventEmitter {
     })
   }
 
-  _onConnectionEnd (idB58Str, conn, err) {
+  _onConnectionEnd (idB58Str, peer, err) {
     // socket hang up, means the one side canceled
     if (err && err.message !== 'socket hang up') {
       log.err(err)
     }
 
-    log('connection ended', idB58Str)
-    // const peer = this.peers.get(idB58Str)
-    // if (peer && (peer.conn === null || peer.conn === conn)) {
-    log('delete peer', idB58Str)
-    this.peers.delete(idB58Str)
-    // }
+
+    log('connection ended', idB58Str, err ? err.message : '')
+    this._removePeer(peer)
   }
 
   _emitMessages (topics, messages) {
@@ -255,10 +274,13 @@ class FloodSub extends EventEmitter {
     this.libp2p.unhandle(multicodec)
     this.libp2p.removeListener('peer:connect', this._dialPeer)
 
+    log('stopping')
     asyncEach(this.peers.values(), (peer, cb) => peer.close(cb), (err) => {
       if (err) {
         return callback(err)
       }
+
+      log('stopped')
       this.peers = new Map()
       this.subscriptions = new Set()
       this.started = false
