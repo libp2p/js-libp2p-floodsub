@@ -181,10 +181,10 @@ class FloodSub extends EventEmitter {
       this.cache.put(seqno)
 
       // 2. emit to self
-      this._emitMessages(msg.topicCIDs, [msg])
+      this._emitMessages(msg.topicIDs, [msg])
 
       // 3. propagate msg to others
-      this._forwardMessages(msg.topicCIDs, [msg])
+      this._forwardMessages(msg.topicIDs, [msg])
     })
   }
 
@@ -206,14 +206,7 @@ class FloodSub extends EventEmitter {
       }
 
       messages.forEach((message) => {
-        // Convert RPC message to API message
-        const m = {
-          from: message.from,
-          data: message.data,
-          seqno: message.seqno,
-          topicIDs: message.topicCIDs
-        }
-        this.emit(topic, m)
+        this.emit(topic, message)
       })
     })
   }
@@ -314,7 +307,7 @@ class FloodSub extends EventEmitter {
         from: from,
         data: msg,
         seqno: new Buffer(seqno),
-        topicCIDs: topics
+        topicIDs: topics
       }
     }
 

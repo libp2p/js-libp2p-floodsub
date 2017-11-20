@@ -13,6 +13,6 @@ message RPC {
     optional bytes from = 1;
     optional bytes data = 2;
     optional bytes seqno = 3;
-    repeated string topicCIDs = 4; // CID of topic descriptor object
+    repeated string topicIDs = 4; 
   }
 }`
