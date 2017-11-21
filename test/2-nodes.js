@@ -287,15 +287,15 @@ describe('basics between 2 nodes', () => {
       ], done)
     })
 
-    it.skip('peer is removed from the state when connection ends', (done) => {
+    it('peer is removed from the state when connection ends', (done) => {
       nodeA.dial(nodeB.peerInfo, (err) => {
         expect(err).to.not.exist()
         setTimeout(() => {
-          expect(fsA.peers.size).to.equal(1)
-          expect(fsB.peers.size).to.equal(1)
+          expect(first(fsA.peers)._references).to.equal(2)
+          expect(first(fsB.peers)._references).to.equal(2)
 
           fsA.stop(() => setTimeout(() => {
-            expect(fsB.peers.size).to.equal(0)
+            expect(first(fsB.peers)._references).to.equal(1)
             done()
           }, 250))
         }, 1000)
