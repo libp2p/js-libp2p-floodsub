@@ -142,6 +142,30 @@ describe('basics between 2 nodes', () => {
       _times(10, () => fsB.publish('Z', new Buffer('banana')))
     })
 
+    it('Publish 10 msg to a topic:Z in nodeB as array', (done) => {
+      let counter = 0
+
+      fsB.once('Z', shouldNotHappen)
+
+      fsA.on('Z', receivedMsg)
+
+      function receivedMsg (msg) {
+        expect(msg.data.toString()).to.equal('banana')
+        expect(msg.from).to.be.eql(fsB.libp2p.peerInfo.id.toB58String())
+        expect(Buffer.isBuffer(msg.seqno)).to.be.true()
+        expect(msg.topicIDs).to.be.eql(['Z'])
+
+        if (++counter === 10) {
+          fsA.removeListener('Z', receivedMsg)
+          done()
+        }
+      }
+
+      let msgs = []
+      _times(10, () => msgs.push(new Buffer('banana')))
+      fsB.publish('Z', msgs)
+    })
+
     it('Unsubscribe from topic:Z in nodeA', (done) => {
       fsA.unsubscribe('Z')
       expect(fsA.subscriptions.size).to.equal(0)
