@@ -337,14 +337,18 @@ class FloodSub extends EventEmitter {
 
     topics.forEach((topic) => this.subscriptions.add(topic))
 
-    this.peers.forEach((peer) => checkIfReady(peer))
+    this.peers.forEach((peer) => sendSubscriptionsOnceReady(peer))
     // make sure that FloodSub is already mounted
-    function checkIfReady (peer) {
+    function sendSubscriptionsOnceReady (peer) {
       if (peer && peer.isWritable) {
-        peer.sendSubscriptions(topics)
-      } else {
-        setImmediate(checkIfReady.bind(peer))
+        return peer.sendSubscriptions(topics)
       }
+      const onConnection = () => {
+        peer.removeListened('connection', onConnection)
+        sendSubscriptionsOnceReady(peer)
+      }
+      peer.on('connection', onConnection)
+      peer.once('close', () => peer.removeListened('connection', onConnection))
     }
   }
 
