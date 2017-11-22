@@ -344,11 +344,11 @@ class FloodSub extends EventEmitter {
         return peer.sendSubscriptions(topics)
       }
       const onConnection = () => {
-        peer.removeListened('connection', onConnection)
+        peer.removeListener('connection', onConnection)
         sendSubscriptionsOnceReady(peer)
       }
       peer.on('connection', onConnection)
-      peer.once('close', () => peer.removeListened('connection', onConnection))
+      peer.once('close', () => peer.removeListener('connection', onConnection))
     }
   }
 
