@@ -12,19 +12,19 @@ exports = module.exports
  * @private
  */
 exports.randomSeqno = () => {
-  return crypto.randomBytes(20).toString('hex')
+  return crypto.randomBytes(20)
 }
 
 /**
  * Generate a message id, based on the `from` and `seqno`.
  *
  * @param {string} from
- * @param {string} seqno
+ * @param {Buffer} seqno
  * @returns {string}
  * @private
  */
 exports.msgId = (from, seqno) => {
-  return from + seqno
+  return from + seqno.toString('hex')
 }
 
 /**
