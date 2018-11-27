@@ -59,7 +59,7 @@ describe('multiple nodes (more than 2)', () => {
         ], (err) => {
           expect(err).to.not.exist()
           // wait for the pubsub pipes to be established
-          setTimeout(done, 400)
+          setTimeout(done, 1000)
         })
       })
 
