@@ -59,7 +59,7 @@ describe('multiple nodes (more than 2)', () => {
         ], (err) => {
           expect(err).to.not.exist()
           // wait for the pubsub pipes to be established
-          setTimeout(done, 200)
+          setTimeout(done, 400)
         })
       })
 
@@ -76,7 +76,7 @@ describe('multiple nodes (more than 2)', () => {
           expectSet(first(c.ps.peers).topics, [])
 
           done()
-        }, 200)
+        }, 400)
       })
 
       it('subscribe to the topic on node b', (done) => {
@@ -91,7 +91,7 @@ describe('multiple nodes (more than 2)', () => {
           expectSet(first(c.ps.peers).topics, ['Z'])
 
           done()
-        }, 200)
+        }, 400)
       })
 
       it('subscribe to the topic on node c', (done) => {
@@ -108,7 +108,7 @@ describe('multiple nodes (more than 2)', () => {
           })
 
           done()
-        }, 200)
+        }, 400)
       })
 
       it('publish on node a', (done) => {
