@@ -69,7 +69,8 @@ describe('multiple nodes (more than 2)', () => {
 
         b.ps.once('floodsub:subscription-change', () => {
           expect(b.ps.peers.size).to.equal(2)
-          const topics = Array.from(b.ps.peers.values())[1].topics
+          const aPeerId = a.libp2p.peerInfo.id.toB58String()
+          const topics = b.ps.peers.get(aPeerId).topics
           expectSet(topics, ['Z'])
 
           expect(c.ps.peers.size).to.equal(1)
