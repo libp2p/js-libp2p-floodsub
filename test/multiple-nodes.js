@@ -84,7 +84,10 @@ describe('multiple nodes (more than 2)', () => {
         b.ps.subscribe('Z')
         expectSet(b.ps.subscriptions, ['Z'])
 
-        a.ps.once('floodsub:subscription-change', () => {
+        parallel([
+          cb => a.ps.once('floodsub:subscription-change', () => cb()),
+          cb => c.ps.once('floodsub:subscription-change', () => cb())
+        ], () => {
           expect(a.ps.peers.size).to.equal(1)
           expectSet(first(a.ps.peers).topics, ['Z'])
 
