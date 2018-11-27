@@ -76,11 +76,16 @@ describe('basics between 2 nodes', () => {
     })
 
     it('Subscribe to a topic:Z in nodeA', (done) => {
+      let subChanges
+      fsB.once('floodsub:subscription-change', (...args) => { subChanges = args })
       fsA.subscribe('Z')
       setTimeout(() => {
         expectSet(fsA.subscriptions, ['Z'])
         expect(fsB.peers.size).to.equal(1)
         expectSet(first(fsB.peers).topics, ['Z'])
+        expect(subChanges[0].id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
+        expectSet(subChanges[1], ['Z'])
+        expect(subChanges[2]).to.be.eql([{ topicCID: 'Z', subscribe: true }])
         done()
       }, 100)
     })
@@ -167,12 +172,17 @@ describe('basics between 2 nodes', () => {
     })
 
     it('Unsubscribe from topic:Z in nodeA', (done) => {
+      let subChanges
+      fsB.once('floodsub:subscription-change', (...args) => { subChanges = args })
       fsA.unsubscribe('Z')
       expect(fsA.subscriptions.size).to.equal(0)
 
       setTimeout(() => {
         expect(fsB.peers.size).to.equal(1)
         expectSet(first(fsB.peers).topics, [])
+        expect(subChanges[0].id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
+        expectSet(subChanges[1], [])
+        expect(subChanges[2]).to.be.eql([{ topicCID: 'Z', subscribe: false }])
         done()
       }, 100)
     })
