@@ -76,25 +76,19 @@ describe('basics between 2 nodes', () => {
     })
 
     it('Subscribe to a topic:Z in nodeA', (done) => {
-      let subChanges
-      fsB.once('floodsub:subscription-change', (...args) => { subChanges = args })
       fsA.subscribe('Z')
-      setTimeout(() => {
+      fsB.once('floodsub:subscription-change', (changedPeerInfo, changedTopics, changedSubs) => {
         expectSet(fsA.subscriptions, ['Z'])
         expect(fsB.peers.size).to.equal(1)
         expectSet(first(fsB.peers).topics, ['Z'])
-        expect(subChanges[0].id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
-        expectSet(subChanges[1], ['Z'])
-        expect(subChanges[2]).to.be.eql([{ topicCID: 'Z', subscribe: true }])
+        expect(changedPeerInfo.id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
+        expectSet(changedTopics, ['Z'])
+        expect(changedSubs).to.be.eql([{ topicCID: 'Z', subscribe: true }])
         done()
-      }, 100)
+      })
     })
 
     it('Publish to a topic:Z in nodeA', (done) => {
-      fsB.once('Z', shouldNotHappen)
-
-      function shouldNotHappen (msg) { expect.fail() }
-
       fsA.once('Z', (msg) => {
         expect(msg.data.toString()).to.equal('hey')
         fsB.removeListener('Z', shouldNotHappen)
@@ -107,8 +101,6 @@ describe('basics between 2 nodes', () => {
     })
 
     it('Publish to a topic:Z in nodeB', (done) => {
-      fsB.once('Z', shouldNotHappen)
-
       fsA.once('Z', (msg) => {
         fsA.once('Z', shouldNotHappen)
         expect(msg.data.toString()).to.equal('banana')
@@ -140,6 +132,7 @@ describe('basics between 2 nodes', () => {
 
         if (++counter === 10) {
           fsA.removeListener('Z', receivedMsg)
+          fsB.removeListener('Z', shouldNotHappen)
           done()
         }
       }
@@ -162,6 +155,7 @@ describe('basics between 2 nodes', () => {
 
         if (++counter === 10) {
           fsA.removeListener('Z', receivedMsg)
+          fsB.removeListener('Z', shouldNotHappen)
           done()
         }
       }
@@ -172,19 +166,17 @@ describe('basics between 2 nodes', () => {
     })
 
     it('Unsubscribe from topic:Z in nodeA', (done) => {
-      let subChanges
-      fsB.once('floodsub:subscription-change', (...args) => { subChanges = args })
       fsA.unsubscribe('Z')
       expect(fsA.subscriptions.size).to.equal(0)
 
-      setTimeout(() => {
+      fsB.once('floodsub:subscription-change', (changedPeerInfo, changedTopics, changedSubs) => {
         expect(fsB.peers.size).to.equal(1)
         expectSet(first(fsB.peers).topics, [])
-        expect(subChanges[0].id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
-        expectSet(subChanges[1], [])
-        expect(subChanges[2]).to.be.eql([{ topicCID: 'Z', subscribe: false }])
+        expect(changedPeerInfo.id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
+        expectSet(changedTopics, [])
+        expect(changedSubs).to.be.eql([{ topicCID: 'Z', subscribe: false }])
         done()
-      }, 100)
+      })
     })
 
     it('Publish to a topic:Z in nodeA nodeB', (done) => {
@@ -252,22 +244,26 @@ describe('basics between 2 nodes', () => {
     })
 
     it('existing subscriptions are sent upon peer connection', (done) => {
+      parallel([
+        cb => fsA.once('floodsub:subscription-change', () => cb()),
+        cb => fsB.once('floodsub:subscription-change', () => cb())
+      ], () => {
+        expect(fsA.peers.size).to.equal(1)
+        expect(fsB.peers.size).to.equal(1)
+
+        expectSet(fsA.subscriptions, ['Za'])
+        expect(fsB.peers.size).to.equal(1)
+        expectSet(first(fsB.peers).topics, ['Za'])
+
+        expectSet(fsB.subscriptions, ['Zb'])
+        expect(fsA.peers.size).to.equal(1)
+        expectSet(first(fsA.peers).topics, ['Zb'])
+
+        done()
+      })
+
       nodeA.dial(nodeB.peerInfo, (err) => {
         expect(err).to.not.exist()
-        setTimeout(() => {
-          expect(fsA.peers.size).to.equal(1)
-          expect(fsB.peers.size).to.equal(1)
-
-          expectSet(fsA.subscriptions, ['Za'])
-          expect(fsB.peers.size).to.equal(1)
-          expectSet(first(fsB.peers).topics, ['Za'])
-
-          expectSet(fsB.subscriptions, ['Zb'])
-          expect(fsA.peers.size).to.equal(1)
-          expectSet(first(fsA.peers).topics, ['Zb'])
-
-          done()
-        }, 1000)
       })
     })
 

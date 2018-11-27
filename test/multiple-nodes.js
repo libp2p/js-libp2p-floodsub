@@ -67,7 +67,7 @@ describe('multiple nodes (more than 2)', () => {
         a.ps.subscribe('Z')
         expectSet(a.ps.subscriptions, ['Z'])
 
-        setTimeout(() => {
+        b.ps.once('floodsub:subscription-change', () => {
           expect(b.ps.peers.size).to.equal(2)
           const topics = Array.from(b.ps.peers.values())[1].topics
           expectSet(topics, ['Z'])
@@ -76,14 +76,14 @@ describe('multiple nodes (more than 2)', () => {
           expectSet(first(c.ps.peers).topics, [])
 
           done()
-        }, 400)
+        })
       })
 
       it('subscribe to the topic on node b', (done) => {
         b.ps.subscribe('Z')
         expectSet(b.ps.subscriptions, ['Z'])
 
-        setTimeout(() => {
+        a.ps.once('floodsub:subscription-change', () => {
           expect(a.ps.peers.size).to.equal(1)
           expectSet(first(a.ps.peers).topics, ['Z'])
 
@@ -91,14 +91,14 @@ describe('multiple nodes (more than 2)', () => {
           expectSet(first(c.ps.peers).topics, ['Z'])
 
           done()
-        }, 400)
+        })
       })
 
       it('subscribe to the topic on node c', (done) => {
         c.ps.subscribe('Z')
         expectSet(c.ps.subscriptions, ['Z'])
 
-        setTimeout(() => {
+        b.ps.once('floodsub:subscription-change', () => {
           expect(a.ps.peers.size).to.equal(1)
           expectSet(first(a.ps.peers).topics, ['Z'])
 
@@ -108,7 +108,7 @@ describe('multiple nodes (more than 2)', () => {
           })
 
           done()
-        }, 400)
+        })
       })
 
       it('publish on node a', (done) => {
