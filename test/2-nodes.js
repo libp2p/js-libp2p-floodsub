@@ -390,6 +390,61 @@ describe('basics between 2 nodes', () => {
       ], done)
     })
   })
+
+  describe('prevent concurrent dials', () => {
+    let nodeA
+    let nodeB
+    let fsA
+
+    before((done) => {
+      series([
+        (cb) => createNode('/ip4/127.0.0.1/tcp/0', cb),
+        (cb) => createNode('/ip4/127.0.0.1/tcp/0', cb)
+      ], (err, nodes) => {
+        if (err) return done(err)
+
+        nodeA = nodes[0]
+        nodeB = nodes[1]
+
+        // Put node B in node A's peer book
+        nodeA.peerBook.put(nodeB.peerInfo)
+
+        fsA = new FloodSub(nodeA)
+
+        done()
+      })
+    })
+
+    after((done) => {
+      parallel([
+        (cb) => nodeA.stop(cb),
+        (cb) => nodeB.stop(cb)
+      ], done)
+    })
+
+    it('does not dial twice to same peer', (done) => {
+      let dialingCount = 0
+      fsA.on('floodsub:dialing', () => {
+        dialingCount++
+      })
+
+      // When node A starts, it will dial all peers in its peer book, which
+      // is just peer B
+      fsA.start(startComplete)
+
+      // Simulate a connection coming in from peer B at the same time. This
+      // causes floodsub to dial peer B
+      nodeA.emit('peer:connect', nodeB.peerInfo)
+
+      function startComplete () {
+        // Check that only one dial was made
+        setImmediate(() => {
+          expect(dialingCount).to.equal(1)
+          done()
+        })
+      }
+    })
+  })
 })
 
 function shouldNotHappen (msg) {
