@@ -98,7 +98,6 @@ class BaseProtocol extends EventEmitter {
     this._dials.add(idB58Str)
 
     this.log('dialing %s', idB58Str)
-    this.emit('floodsub:dialing', peerInfo)
     this.libp2p.dialProtocol(peerInfo, this.multicodec, (err, conn) => {
       if (err) {
         this.log.err(err)
@@ -112,7 +111,6 @@ class BaseProtocol extends EventEmitter {
       }
       this._dials.delete(idB58Str)
 
-      this.emit('floodsub:dialed', peerInfo, conn)
       this._onDial(peerInfo, conn, callback)
     })
   }

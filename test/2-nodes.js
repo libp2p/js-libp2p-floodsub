@@ -4,6 +4,7 @@
 
 const chai = require('chai')
 chai.use(require('dirty-chai'))
+chai.use(require('chai-spies'))
 const expect = chai.expect
 const parallel = require('async/parallel')
 const series = require('async/series')
@@ -392,11 +393,14 @@ describe('basics between 2 nodes', () => {
   })
 
   describe('prevent concurrent dials', () => {
+    let sandbox
     let nodeA
     let nodeB
     let fsA
 
     before((done) => {
+      sandbox = chai.spy.sandbox()
+
       series([
         (cb) => createNode('/ip4/127.0.0.1/tcp/0', cb),
         (cb) => createNode('/ip4/127.0.0.1/tcp/0', cb)
@@ -416,6 +420,8 @@ describe('basics between 2 nodes', () => {
     })
 
     after((done) => {
+      sandbox.restore()
+
       parallel([
         (cb) => nodeA.stop(cb),
         (cb) => nodeB.stop(cb)
@@ -423,10 +429,7 @@ describe('basics between 2 nodes', () => {
     })
 
     it('does not dial twice to same peer', (done) => {
-      let dialingCount = 0
-      fsA.on('floodsub:dialing', () => {
-        dialingCount++
-      })
+      sandbox.on(fsA, ['_onDial'])
 
       // When node A starts, it will dial all peers in its peer book, which
       // is just peer B
@@ -439,7 +442,7 @@ describe('basics between 2 nodes', () => {
       function startComplete () {
         // Check that only one dial was made
         setImmediate(() => {
-          expect(dialingCount).to.equal(1)
+          expect(fsA._onDial).to.have.been.called.once()
           done()
         })
       }
