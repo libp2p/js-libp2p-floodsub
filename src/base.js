@@ -199,6 +199,9 @@ class BaseProtocol extends EventEmitter {
     this.libp2p.unhandle(this.multicodec)
     this.libp2p.removeListener('peer:connect', this._dialPeer)
 
+    // Prevent any dials that are in flight from being processed
+    this._dials = new Set()
+
     this.log('stopping')
     asyncEach(this.peers.values(), (peer, cb) => peer.close(cb), (err) => {
       if (err) {
@@ -207,7 +210,6 @@ class BaseProtocol extends EventEmitter {
 
       this.log('stopped')
       this.peers = new Map()
-      this._dials = new Set()
       this.started = false
       callback()
     })
