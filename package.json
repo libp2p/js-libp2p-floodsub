@@ -44,7 +44,7 @@
     "dirty-chai": "^2.0.1",
     "libp2p": "~0.24.1",
     "libp2p-secio": "~0.10.1",
-    "libp2p-spdy": "github:libp2p/js-libp2p-spdy#fix/conditional-error",
+    "libp2p-spdy": "~0.13.1",
     "libp2p-tcp": "~0.13.0",
     "peer-id": "~0.12.0",
     "peer-info": "~0.15.0"
