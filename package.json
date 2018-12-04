@@ -18,8 +18,7 @@
     "coverage-publish": "aegir coverage --provider coveralls"
   },
   "pre-push": [
-    "lint",
-    "test"
+    "lint"
   ],
   "repository": {
     "type": "git",
