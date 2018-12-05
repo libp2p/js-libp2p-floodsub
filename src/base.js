@@ -93,12 +93,14 @@ class BaseProtocol extends EventEmitter {
 
     // If already dialing this peer, ignore
     if (this._dials.has(idB58Str)) {
+      this.log('already dialing %s, ignoring dial attempt', idB58Str)
       return setImmediate(() => callback())
     }
     this._dials.add(idB58Str)
 
     this.log('dialing %s', idB58Str)
     this.libp2p.dialProtocol(peerInfo, this.multicodec, (err, conn) => {
+      this.log('dial to %s complete', idB58Str)
       if (err) {
         this.log.err(err)
         return callback()
@@ -107,6 +109,7 @@ class BaseProtocol extends EventEmitter {
       // If the dial is not in the set, it means that floodsub has been
       // stopped, so we should just bail out
       if (!this._dials.has(idB58Str)) {
+        this.log('floodsub was stopped, not processing dial to %s', idB58Str)
         return callback()
       }
       this._dials.delete(idB58Str)

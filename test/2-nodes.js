@@ -397,6 +397,7 @@ describe('basics between 2 nodes', () => {
     let nodeA
     let nodeB
     let fsA
+    let fsB
 
     before((done) => {
       sandbox = chai.spy.sandbox()
@@ -414,8 +415,9 @@ describe('basics between 2 nodes', () => {
         nodeA.peerBook.put(nodeB.peerInfo)
 
         fsA = new FloodSub(nodeA)
+        fsB = new FloodSub(nodeB)
 
-        done()
+        fsB.start(done)
       })
     })
 
