@@ -458,6 +458,7 @@ describe('basics between 2 nodes', () => {
     let nodeA
     let nodeB
     let fsA
+    let fsB
 
     before((done) => {
       sandbox = chai.spy.sandbox()
@@ -472,8 +473,12 @@ describe('basics between 2 nodes', () => {
         nodeB = nodes[1]
 
         fsA = new FloodSub(nodeA)
+        fsB = new FloodSub(nodeB)
 
-        done()
+        parallel([
+          (cb) => fsA.start(cb),
+          (cb) => fsB.start(cb)
+        ], done)
       })
     })
 
@@ -496,15 +501,13 @@ describe('basics between 2 nodes', () => {
       nodeA.emit('peer:connect', nodeB.peerInfo)
 
       // Stop floodsub before the dial can complete
-      fsA.stop(stopComplete)
-
-      function stopComplete () {
+      fsA.stop(() => {
         // Check that the dial was not processed
         setTimeout(() => {
           expect(fsA._onDial).to.not.have.been.called()
           done()
         }, 1000)
-      }
+      })
     })
   })
 })
