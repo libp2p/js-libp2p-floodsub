@@ -3,7 +3,7 @@ module.exports = `
 message TopicDescriptor {
   optional string name = 1;
   optional AuthOpts auth = 2;
-  optional EncOpts enc = 2;
+  optional EncOpts enc = 3;
 
   message AuthOpts {
     optional AuthMode mode = 1;
