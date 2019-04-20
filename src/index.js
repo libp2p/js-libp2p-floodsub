@@ -7,7 +7,7 @@ const assert = require('assert')
 
 const BaseProtocol = require('libp2p-pubsub')
 const { message } = require('libp2p-pubsub')
-const utils = require('./utils')
+const utils = require('libp2p-pubsub/src/utils')
 const config = require('./config')
 
 const multicodec = config.multicodec

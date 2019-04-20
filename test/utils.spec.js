@@ -3,7 +3,7 @@
 
 const expect = require('chai').expect
 
-const utils = require('../src/utils')
+const utils = require('libp2p-pubsub/src/utils')
 
 describe('utils', () => {
   it('randomSeqno', () => {
