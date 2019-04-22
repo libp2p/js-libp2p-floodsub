@@ -6,8 +6,7 @@ const lp = require('pull-length-prefixed')
 const assert = require('assert')
 
 const BaseProtocol = require('libp2p-pubsub')
-const { message } = require('libp2p-pubsub')
-const utils = require('libp2p-pubsub/src/utils')
+const { message, utils } = require('libp2p-pubsub')
 const config = require('./config')
 
 const multicodec = config.multicodec
