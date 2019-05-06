@@ -12,6 +12,7 @@ const multicodec = config.multicodec
 const ensureArray = utils.ensureArray
 const setImmediate = require('async/setImmediate')
 const asyncMap = require('async/map')
+const noop = () => {}
 
 /**
  * FloodSub (aka dumbsub is an implementation of pubsub focused on
@@ -165,6 +166,7 @@ class FloodSub extends BaseProtocol {
    */
   publish (topics, messages, callback) {
     assert(this.started, 'FloodSub is not started')
+    callback = callback || noop
 
     this.log('publish', topics, messages)
 
