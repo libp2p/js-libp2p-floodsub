@@ -11,6 +11,7 @@ const config = require('./config')
 const multicodec = config.multicodec
 const ensureArray = utils.ensureArray
 const setImmediate = require('async/setImmediate')
+const asyncMap = require('async/map')
 
 /**
  * FloodSub (aka dumbsub is an implementation of pubsub focused on
@@ -158,10 +159,11 @@ class FloodSub extends BaseProtocol {
    * @override
    * @param {Array<string>|string} topics
    * @param {Array<any>|any} messages
+   * @param {function(Error)} callback
    * @returns {undefined}
    *
    */
-  publish (topics, messages) {
+  publish (topics, messages, callback) {
     assert(this.started, 'FloodSub is not started')
 
     this.log('publish', topics, messages)
@@ -171,25 +173,29 @@ class FloodSub extends BaseProtocol {
 
     const from = this.libp2p.peerInfo.id.toB58String()
 
-    const buildMessage = (msg) => {
+    const buildMessage = (msg, cb) => {
       const seqno = utils.randomSeqno()
       this.seenCache.put(utils.msgId(from, seqno))
 
-      return {
+      this._buildMessage({
         from: from,
         data: msg,
         seqno: seqno,
         topicIDs: topics
-      }
+      }, cb)
     }
 
-    const msgObjects = messages.map(buildMessage)
+    asyncMap(messages, buildMessage, (err, msgObjects) => {
+      if (err) return callback(err)
 
-    // Emit to self if I'm interested
-    this._emitMessages(topics, msgObjects)
+      // Emit to self if I'm interested
+      this._emitMessages(topics, msgObjects)
 
-    // send to all the other peers
-    this._forwardMessages(topics, msgObjects)
+      // send to all the other peers
+      this._forwardMessages(topics, msgObjects)
+
+      callback(null)
+    })
   }
 
   /**
