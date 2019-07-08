@@ -118,16 +118,17 @@ class FloodSub extends BaseProtocol {
     }
 
     this.seenCache.put(seqno)
+    // 2. validate the message (signature verification)
     this.validate(message, (err, isValid) => {
       if (err || !isValid) {
         this.log('Message could not be validated, dropping it. isValid=%s', isValid, err)
         return
       }
 
-      // 2. emit to self
+      // 3. if message is valid, emit to self
       this._emitMessages(msg.topicIDs, [msg])
 
-      // 3. propagate msg to others
+      // 4. if message is valid, propagate msg to others
       this._forwardMessages(msg.topicIDs, [msg])
     })
   }
