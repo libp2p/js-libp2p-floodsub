@@ -23,7 +23,7 @@ class FloodSub extends BaseProtocol {
   /**
    * @param {Object} libp2p an instance of Libp2p
    * @param {Object} [options]
-   * @param {bool} options.emitSelf if publish should emit to self, if subscribed, defaults to true
+   * @param {boolean} options.emitSelf if publish should emit to self, if subscribed, defaults to true
    * @constructor
    */
   constructor (libp2p, options = {}) {
