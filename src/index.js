@@ -11,8 +11,7 @@ const config = require('./config')
 const multicodec = config.multicodec
 const ensureArray = utils.ensureArray
 const setImmediate = require('async/setImmediate')
-const asyncMap = require('async/map')
-const noop = () => {}
+const pMap = require('p-map')
 
 /**
  * FloodSub (aka dumbsub is an implementation of pubsub focused on
@@ -49,19 +48,16 @@ class FloodSub extends BaseProtocol {
    * @override
    * @param {PeerInfo} peerInfo peer info
    * @param {Connection} conn connection to the peer
-   * @param {function} callback
    */
-  _onDial (peerInfo, conn, callback) {
-    super._onDial(peerInfo, conn, (err) => {
-      if (err) return callback(err)
-      const idB58Str = peerInfo.id.toB58String()
-      const peer = this.peers.get(idB58Str)
-      if (peer && peer.isWritable) {
-        // Immediately send my own subscriptions to the newly established conn
-        peer.sendSubscriptions(this.subscriptions)
-      }
-      setImmediate(() => callback())
-    })
+  _onDial (peerInfo, conn) {
+    super._onDial(peerInfo, conn)
+    const idB58Str = peerInfo.id.toB58String()
+    const peer = this.peers.get(idB58Str)
+
+    if (peer && peer.isWritable) {
+      // Immediately send my own subscriptions to the newly established conn
+      peer.sendSubscriptions(this.subscriptions)
+    }
   }
 
   /**
@@ -71,7 +67,7 @@ class FloodSub extends BaseProtocol {
    * @param {string} idB58Str peer id string in base58
    * @param {Connection} conn connection
    * @param {PeerInfo} peer peer info
-   * @returns {undefined}
+   * @returns {void}
    *
    */
   _processConnection (idB58Str, conn, peer) {
@@ -119,7 +115,7 @@ class FloodSub extends BaseProtocol {
    * @param {rpc.RPC.Message} message The message to process
    * @returns {void}
    */
-  _processRpcMessage (message) {
+  async _processRpcMessage (message) {
     const msg = utils.normalizeInRpcMessage(message)
     const seqno = utils.msgId(msg.from, msg.seqno)
     // 1. check if I've seen the message, if yes, ignore
@@ -128,19 +124,27 @@ class FloodSub extends BaseProtocol {
     }
 
     this.seenCache.put(seqno)
+
     // 2. validate the message (signature verification)
-    this.validate(message, (err, isValid) => {
-      if (err || !isValid) {
-        this.log('Message could not be validated, dropping it. isValid=%s', isValid, err)
-        return
-      }
+    let isValid
+    let error
 
-      // 3. if message is valid, emit to self
-      this._emitMessages(msg.topicIDs, [msg])
+    try {
+      isValid = await this.validate(message)
+    } catch (err) {
+      error = err
+    }
 
-      // 4. if message is valid, propagate msg to others
-      this._forwardMessages(msg.topicIDs, [msg])
-    })
+    if (error || !isValid) {
+      this.log('Message could not be validated, dropping it. isValid=%s', isValid, error)
+      return
+    }
+
+    // 3. if message is valid, emit to self
+    this._emitMessages(msg.topicIDs, [msg])
+
+    // 4. if message is valid, propagate msg to others
+    this._forwardMessages(msg.topicIDs, [msg])
   }
 
   _emitMessages (topics, messages) {
@@ -170,16 +174,13 @@ class FloodSub extends BaseProtocol {
   /**
    * Unmounts the floodsub protocol and shuts down every connection
    * @override
-   * @param {Function} callback
-   * @returns {undefined}
+   * @returns {void}
    *
    */
-  stop (callback) {
-    super.stop((err) => {
-      if (err) return callback(err)
-      this.subscriptions = new Set()
-      callback()
-    })
+  stop () {
+    super.stop()
+
+    this.subscriptions = new Set()
   }
 
   /**
@@ -187,13 +188,11 @@ class FloodSub extends BaseProtocol {
    * @override
    * @param {Array<string>|string} topics
    * @param {Array<any>|any} messages
-   * @param {function(Error)} callback
-   * @returns {undefined}
+   * @returns {Promise}
    *
    */
-  publish (topics, messages, callback) {
+  async publish (topics, messages) {
     assert(this.started, 'FloodSub is not started')
-    callback = callback || noop
 
     this.log('publish', topics, messages)
 
@@ -202,7 +201,7 @@ class FloodSub extends BaseProtocol {
 
     const from = this.libp2p.peerInfo.id.toB58String()
 
-    const buildMessage = (msg, cb) => {
+    const buildMessage = (msg) => {
       const seqno = utils.randomSeqno()
       this.seenCache.put(utils.msgId(from, seqno))
 
@@ -216,24 +215,20 @@ class FloodSub extends BaseProtocol {
       // Emit to self if I'm interested and it is enabled
       this._options.emitSelf && this._emitMessages(topics, [message])
 
-      this._buildMessage(message, cb)
+      return this._buildMessage(message)
     }
 
-    asyncMap(messages, buildMessage, (err, msgObjects) => {
-      if (err) return callback(err)
+    const msgObjects = await pMap(messages, buildMessage)
 
-      // send to all the other peers
-      this._forwardMessages(topics, msgObjects)
-
-      callback(null)
-    })
+    // send to all the other peers
+    this._forwardMessages(topics, msgObjects)
   }
 
   /**
    * Subscribe to the given topic(s).
    * @override
    * @param {Array<string>|string} topics
-   * @returns {undefined}
+   * @returns {void}
    */
   subscribe (topics) {
     assert(this.started, 'FloodSub is not started')
@@ -261,7 +256,7 @@ class FloodSub extends BaseProtocol {
    * Unsubscribe from the given topic(s).
    * @override
    * @param {Array<string>|string} topics
-   * @returns {undefined}
+   * @returns {void}
    */
   unsubscribe (topics) {
     // Avoid race conditions, by quietly ignoring unsub when shutdown.

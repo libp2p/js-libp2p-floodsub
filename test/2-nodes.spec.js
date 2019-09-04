@@ -6,8 +6,6 @@ const chai = require('chai')
 chai.use(require('dirty-chai'))
 chai.use(require('chai-spies'))
 const expect = chai.expect
-const parallel = require('async/parallel')
-const series = require('async/series')
 const times = require('lodash/times')
 
 const FloodSub = require('../src')
@@ -23,181 +21,188 @@ describe('basics between 2 nodes', () => {
     let fsA
     let fsB
 
-    before((done) => {
-      series([
-        (cb) => createNode(cb),
-        (cb) => createNode(cb)
-      ], (err, nodes) => {
-        if (err) {
-          return done(err)
-        }
-        nodeA = nodes[0]
-        nodeB = nodes[1]
-        done()
-      })
+    before(async () => {
+      [nodeA, nodeB] = await Promise.all([
+        createNode(),
+        createNode()
+      ])
     })
 
-    after((done) => {
-      parallel([
-        (cb) => nodeA.stop(cb),
-        (cb) => nodeB.stop(cb)
-      ], done)
+    after(() => {
+      return Promise.all([
+        nodeA.stop(),
+        nodeB.stop()
+      ])
     })
 
-    it('Mount the pubsub protocol', (done) => {
+    it('Mount the pubsub protocol', () => {
       fsA = new FloodSub(nodeA, { emitSelf: true })
       fsB = new FloodSub(nodeB, { emitSelf: true })
 
-      setTimeout(() => {
-        expect(fsA.peers.size).to.be.eql(0)
-        expect(fsA.subscriptions.size).to.eql(0)
-        expect(fsB.peers.size).to.be.eql(0)
-        expect(fsB.subscriptions.size).to.eql(0)
-        done()
-      }, 50)
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          expect(fsA.peers.size).to.be.eql(0)
+          expect(fsA.subscriptions.size).to.eql(0)
+          expect(fsB.peers.size).to.be.eql(0)
+          expect(fsB.subscriptions.size).to.eql(0)
+          resolve()
+        }, 50)
+      })
     })
 
-    it('start both FloodSubs', (done) => {
-      parallel([
-        (cb) => fsA.start(cb),
-        (cb) => fsB.start(cb)
-      ], done)
+    it('start both FloodSubs', () => {
+      return Promise.all([
+        fsA.start(),
+        fsB.start()
+      ])
     })
 
-    it('Dial from nodeA to nodeB', (done) => {
-      series([
-        (cb) => nodeA.dial(nodeB.peerInfo, cb),
-        (cb) => setTimeout(() => {
+    it('Dial from nodeA to nodeB', async () => {
+      await nodeA.dial(nodeB.peerInfo)
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
           expect(fsA.peers.size).to.equal(1)
           expect(fsB.peers.size).to.equal(1)
-          cb()
+          resolve()
         }, 1000)
-      ], done)
-    })
-
-    it('Subscribe to a topic:Z in nodeA', (done) => {
-      fsA.subscribe('Z')
-      fsB.once('floodsub:subscription-change', (changedPeerInfo, changedTopics, changedSubs) => {
-        expectSet(fsA.subscriptions, ['Z'])
-        expect(fsB.peers.size).to.equal(1)
-        expectSet(first(fsB.peers).topics, ['Z'])
-        expect(changedPeerInfo.id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
-        expectSet(changedTopics, ['Z'])
-        expect(changedSubs).to.be.eql([{ topicID: 'Z', subscribe: true }])
-        done()
       })
     })
 
-    it('Publish to a topic:Z in nodeA', (done) => {
-      fsA.once('Z', (msg) => {
-        expect(msg.data.toString()).to.equal('hey')
-        fsB.removeListener('Z', shouldNotHappen)
-        done()
+    it('Subscribe to a topic:Z in nodeA', () => {
+      return new Promise((resolve) => {
+        fsA.subscribe('Z')
+        fsB.once('floodsub:subscription-change', (changedPeerInfo, changedTopics, changedSubs) => {
+          expectSet(fsA.subscriptions, ['Z'])
+          expect(fsB.peers.size).to.equal(1)
+          expectSet(first(fsB.peers).topics, ['Z'])
+          expect(changedPeerInfo.id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
+          expectSet(changedTopics, ['Z'])
+          expect(changedSubs).to.be.eql([{ topicID: 'Z', subscribe: true }])
+          resolve()
+        })
       })
-
-      fsB.once('Z', shouldNotHappen)
-
-      fsA.publish('Z', Buffer.from('hey'))
     })
 
-    it('Publish to a topic:Z in nodeB', (done) => {
-      fsA.once('Z', (msg) => {
-        fsA.once('Z', shouldNotHappen)
-        expect(msg.data.toString()).to.equal('banana')
-
-        setTimeout(() => {
-          fsA.removeListener('Z', shouldNotHappen)
+    it('Publish to a topic:Z in nodeA', () => {
+      return new Promise((resolve) => {
+        fsA.once('Z', (msg) => {
+          expect(msg.data.toString()).to.equal('hey')
           fsB.removeListener('Z', shouldNotHappen)
-          done()
-        }, 100)
+          resolve()
+        })
+
+        fsB.once('Z', shouldNotHappen)
+
+        fsA.publish('Z', Buffer.from('hey'))
       })
-
-      fsB.once('Z', shouldNotHappen)
-
-      fsB.publish('Z', Buffer.from('banana'))
     })
 
-    it('Publish 10 msg to a topic:Z in nodeB', (done) => {
+    it('Publish to a topic:Z in nodeB', () => {
+      return new Promise((resolve) => {
+        fsA.once('Z', (msg) => {
+          fsA.once('Z', shouldNotHappen)
+          expect(msg.data.toString()).to.equal('banana')
+
+          setTimeout(() => {
+            fsA.removeListener('Z', shouldNotHappen)
+            fsB.removeListener('Z', shouldNotHappen)
+            resolve()
+          }, 100)
+        })
+
+        fsB.once('Z', shouldNotHappen)
+
+        fsB.publish('Z', Buffer.from('banana'))
+      })
+    })
+
+    it('Publish 10 msg to a topic:Z in nodeB', () => {
       let counter = 0
 
       fsB.once('Z', shouldNotHappen)
 
-      fsA.on('Z', receivedMsg)
+      return new Promise((resolve) => {
+        fsA.on('Z', receivedMsg)
 
-      function receivedMsg (msg) {
-        expect(msg.data.toString()).to.equal('banana')
-        expect(msg.from).to.be.eql(fsB.libp2p.peerInfo.id.toB58String())
-        expect(Buffer.isBuffer(msg.seqno)).to.be.true()
-        expect(msg.topicIDs).to.be.eql(['Z'])
+        function receivedMsg (msg) {
+          expect(msg.data.toString()).to.equal('banana')
+          expect(msg.from).to.be.eql(fsB.libp2p.peerInfo.id.toB58String())
+          expect(Buffer.isBuffer(msg.seqno)).to.be.true()
+          expect(msg.topicIDs).to.be.eql(['Z'])
 
-        if (++counter === 10) {
-          fsA.removeListener('Z', receivedMsg)
-          fsB.removeListener('Z', shouldNotHappen)
-          done()
+          if (++counter === 10) {
+            fsA.removeListener('Z', receivedMsg)
+            fsB.removeListener('Z', shouldNotHappen)
+            resolve()
+          }
         }
-      }
-
-      times(10, () => fsB.publish('Z', Buffer.from('banana')))
+        times(10, () => fsB.publish('Z', Buffer.from('banana')))
+      })
     })
 
-    it('Publish 10 msg to a topic:Z in nodeB as array', (done) => {
+    it('Publish 10 msg to a topic:Z in nodeB as array', () => {
       let counter = 0
 
       fsB.once('Z', shouldNotHappen)
 
-      fsA.on('Z', receivedMsg)
+      return new Promise((resolve) => {
+        fsA.on('Z', receivedMsg)
 
-      function receivedMsg (msg) {
-        expect(msg.data.toString()).to.equal('banana')
-        expect(msg.from).to.be.eql(fsB.libp2p.peerInfo.id.toB58String())
-        expect(Buffer.isBuffer(msg.seqno)).to.be.true()
-        expect(msg.topicIDs).to.be.eql(['Z'])
+        function receivedMsg (msg) {
+          expect(msg.data.toString()).to.equal('banana')
+          expect(msg.from).to.be.eql(fsB.libp2p.peerInfo.id.toB58String())
+          expect(Buffer.isBuffer(msg.seqno)).to.be.true()
+          expect(msg.topicIDs).to.be.eql(['Z'])
 
-        if (++counter === 10) {
-          fsA.removeListener('Z', receivedMsg)
-          fsB.removeListener('Z', shouldNotHappen)
-          done()
+          if (++counter === 10) {
+            fsA.removeListener('Z', receivedMsg)
+            fsB.removeListener('Z', shouldNotHappen)
+            resolve()
+          }
         }
-      }
 
-      let msgs = []
-      times(10, () => msgs.push(Buffer.from('banana')))
-      fsB.publish('Z', msgs)
+        const msgs = []
+        times(10, () => msgs.push(Buffer.from('banana')))
+        fsB.publish('Z', msgs)
+      })
     })
 
-    it('Unsubscribe from topic:Z in nodeA', (done) => {
+    it('Unsubscribe from topic:Z in nodeA', () => {
       fsA.unsubscribe('Z')
       expect(fsA.subscriptions.size).to.equal(0)
 
-      fsB.once('floodsub:subscription-change', (changedPeerInfo, changedTopics, changedSubs) => {
-        expect(fsB.peers.size).to.equal(1)
-        expectSet(first(fsB.peers).topics, [])
-        expect(changedPeerInfo.id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
-        expectSet(changedTopics, [])
-        expect(changedSubs).to.be.eql([{ topicID: 'Z', subscribe: false }])
-        done()
+      return new Promise((resolve) => {
+        fsB.once('floodsub:subscription-change', (changedPeerInfo, changedTopics, changedSubs) => {
+          expect(fsB.peers.size).to.equal(1)
+          expectSet(first(fsB.peers).topics, [])
+          expect(changedPeerInfo.id.toB58String()).to.equal(first(fsB.peers).info.id.toB58String())
+          expectSet(changedTopics, [])
+          expect(changedSubs).to.be.eql([{ topicID: 'Z', subscribe: false }])
+          resolve()
+        })
       })
     })
 
-    it('Publish to a topic:Z in nodeA nodeB', (done) => {
+    it('Publish to a topic:Z in nodeA nodeB', () => {
       fsA.once('Z', shouldNotHappen)
       fsB.once('Z', shouldNotHappen)
 
-      setTimeout(() => {
-        fsA.removeListener('Z', shouldNotHappen)
-        fsB.removeListener('Z', shouldNotHappen)
-        done()
-      }, 100)
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          fsA.removeListener('Z', shouldNotHappen)
+          fsB.removeListener('Z', shouldNotHappen)
+          resolve()
+        }, 100)
 
-      fsB.publish('Z', Buffer.from('banana'))
-      fsA.publish('Z', Buffer.from('banana'))
+        fsB.publish('Z', Buffer.from('banana'))
+        fsA.publish('Z', Buffer.from('banana'))
+      })
     })
 
-    it('stop both FloodSubs', (done) => {
-      parallel([
-        (cb) => fsA.stop(cb),
-        (cb) => fsB.stop(cb)
-      ], done)
+    it('stop both FloodSubs', () => {
+      fsA.stop()
+      fsB.stop()
     })
   })
 
@@ -207,73 +212,58 @@ describe('basics between 2 nodes', () => {
     let fsA
     let fsB
 
-    before((done) => {
-      parallel([
-        (cb) => createNode(cb),
-        (cb) => createNode(cb)
-      ], (err, nodes) => {
-        expect(err).to.not.exist()
+    before(async () => {
+      [nodeA, nodeB] = await Promise.all([
+        createNode(),
+        createNode()
+      ])
 
-        nodeA = nodes[0]
-        nodeB = nodes[1]
+      fsA = new FloodSub(nodeA)
+      fsB = new FloodSub(nodeB)
 
-        fsA = new FloodSub(nodeA)
-        fsB = new FloodSub(nodeB)
+      await Promise.all([
+        fsA.start(),
+        fsB.start()
+      ])
 
-        parallel([
-          (cb) => fsA.start(cb),
-          (cb) => fsB.start(cb)
-        ], next)
+      fsA.subscribe('Za')
+      fsB.subscribe('Zb')
 
-        function next () {
-          fsA.subscribe('Za')
-          fsB.subscribe('Zb')
-
-          expect(fsA.peers.size).to.equal(0)
-          expectSet(fsA.subscriptions, ['Za'])
-          expect(fsB.peers.size).to.equal(0)
-          expectSet(fsB.subscriptions, ['Zb'])
-          done()
-        }
-      })
+      expect(fsA.peers.size).to.equal(0)
+      expectSet(fsA.subscriptions, ['Za'])
+      expect(fsB.peers.size).to.equal(0)
+      expectSet(fsB.subscriptions, ['Zb'])
     })
 
-    after((done) => {
-      parallel([
-        (cb) => nodeA.stop(cb),
-        (cb) => nodeB.stop(cb)
-      ], done)
+    after(() => {
+      return Promise.all([
+        nodeA.stop(),
+        nodeB.stop()
+      ])
     })
 
-    it('existing subscriptions are sent upon peer connection', (done) => {
-      parallel([
-        cb => fsA.once('floodsub:subscription-change', () => cb()),
-        cb => fsB.once('floodsub:subscription-change', () => cb())
-      ], () => {
-        expect(fsA.peers.size).to.equal(1)
-        expect(fsB.peers.size).to.equal(1)
+    it('existing subscriptions are sent upon peer connection', async () => {
+      await Promise.all([
+        nodeA.dial(nodeB.peerInfo),
+        new Promise((resolve) => fsA.once('floodsub:subscription-change', resolve)),
+        new Promise((resolve) => fsB.once('floodsub:subscription-change', resolve))
+      ])
 
-        expectSet(fsA.subscriptions, ['Za'])
-        expect(fsB.peers.size).to.equal(1)
-        expectSet(first(fsB.peers).topics, ['Za'])
+      expect(fsA.peers.size).to.equal(1)
+      expect(fsB.peers.size).to.equal(1)
 
-        expectSet(fsB.subscriptions, ['Zb'])
-        expect(fsA.peers.size).to.equal(1)
-        expectSet(first(fsA.peers).topics, ['Zb'])
+      expectSet(fsA.subscriptions, ['Za'])
+      expect(fsB.peers.size).to.equal(1)
+      expectSet(first(fsB.peers).topics, ['Za'])
 
-        done()
-      })
-
-      nodeA.dial(nodeB.peerInfo, (err) => {
-        expect(err).to.not.exist()
-      })
+      expectSet(fsB.subscriptions, ['Zb'])
+      expect(fsA.peers.size).to.equal(1)
+      expectSet(first(fsA.peers).topics, ['Zb'])
     })
 
-    it('stop both FloodSubs', (done) => {
-      parallel([
-        (cb) => fsA.stop(cb),
-        (cb) => fsB.stop(cb)
-      ], done)
+    it('stop both FloodSubs', () => {
+      fsA.stop()
+      fsB.stop()
     })
   })
 
@@ -283,64 +273,61 @@ describe('basics between 2 nodes', () => {
     let fsA
     let fsB
 
-    before((done) => {
-      series([
-        (cb) => createNode(cb),
-        (cb) => createNode(cb)
-      ], (cb, nodes) => {
-        nodeA = nodes[0]
-        nodeB = nodes[1]
+    before(async () => {
+      [nodeA, nodeB] = await Promise.all([
+        createNode(),
+        createNode()
+      ])
 
-        fsA = new FloodSub(nodeA)
-        fsB = new FloodSub(nodeB)
+      fsA = new FloodSub(nodeA)
+      fsB = new FloodSub(nodeB)
 
-        parallel([
-          (cb) => fsA.start(cb),
-          (cb) => fsB.start(cb)
-        ], next)
+      await Promise.all([
+        fsA.start(),
+        fsB.start()
+      ])
 
-        function next () {
-          fsA.subscribe('Za')
-          fsB.subscribe('Zb')
+      fsA.subscribe('Za')
+      fsB.subscribe('Zb')
 
-          expect(fsA.peers.size).to.equal(0)
-          expectSet(fsA.subscriptions, ['Za'])
-          expect(fsB.peers.size).to.equal(0)
-          expectSet(fsB.subscriptions, ['Zb'])
-          done()
-        }
-      })
+      expect(fsA.peers.size).to.equal(0)
+      expectSet(fsA.subscriptions, ['Za'])
+      expect(fsB.peers.size).to.equal(0)
+      expectSet(fsB.subscriptions, ['Zb'])
     })
 
-    // TODO understand why this test is failing
-    it.skip('peer is removed from the state when connection ends', (done) => {
-      nodeA.dial(nodeB.peerInfo, (err) => {
-        expect(err).to.not.exist()
+    it('peer is removed from the state when connection ends', async () => {
+      await nodeA.dial(nodeB.peerInfo)
+
+      return new Promise((resolve) => {
         setTimeout(() => {
           expect(first(fsA.peers)._references).to.equal(2)
           expect(first(fsB.peers)._references).to.equal(2)
 
-          fsA.stop(() => setTimeout(() => {
+          fsA.stop()
+          setTimeout(() => {
             expect(first(fsB.peers)._references).to.equal(1)
-            done()
-          }, 1000))
+            resolve()
+          }, 1000)
         }, 1000)
       })
     })
 
-    it('stop one node', (done) => {
-      parallel([
-        (cb) => nodeA.stop(cb),
-        (cb) => nodeB.stop(cb)
-      ], done)
+    it('stop one node', () => {
+      return Promise.all([
+        nodeA.stop(),
+        nodeB.stop()
+      ])
     })
 
-    it('nodes don\'t have peers in it', (done) => {
-      setTimeout(() => {
-        expect(fsA.peers.size).to.equal(0)
-        expect(fsB.peers.size).to.equal(0)
-        done()
-      }, 1000)
+    it('nodes don\'t have peers in it', () => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          expect(fsA.peers.size).to.equal(0)
+          expect(fsB.peers.size).to.equal(0)
+          resolve()
+        }, 1000)
+      })
     })
   })
 
@@ -350,45 +337,39 @@ describe('basics between 2 nodes', () => {
     let fsA
     let fsB
 
-    before((done) => {
-      series([
-        (cb) => createNode(cb),
-        (cb) => createNode(cb)
-      ], (cb, nodes) => {
-        nodeA = nodes[0]
-        nodeB = nodes[1]
-        nodeA.dial(nodeB.peerInfo, () => setTimeout(done, 1000))
-      })
+    before(async () => {
+      [nodeA, nodeB] = await Promise.all([
+        createNode(),
+        createNode()
+      ])
+
+      await nodeA.dial(nodeB.peerInfo)
+      await new Promise((resolve) => setTimeout(resolve, 1000))
     })
 
-    after((done) => {
-      parallel([
-        (cb) => nodeA.stop(cb),
-        (cb) => nodeB.stop(cb)
-      ], done)
+    after(() => {
+      return Promise.all([
+        nodeA.stop(),
+        nodeB.stop()
+      ])
     })
 
-    it('dial on floodsub on mount', (done) => {
+    it('dial on floodsub on mount', async () => {
       fsA = new FloodSub(nodeA, { emitSelf: true })
       fsB = new FloodSub(nodeB, { emitSelf: true })
 
-      parallel([
-        (cb) => fsA.start(cb),
-        (cb) => fsB.start(cb)
-      ], next)
+      await Promise.all([
+        fsA.start(),
+        fsB.start()
+      ])
 
-      function next () {
-        expect(fsA.peers.size).to.equal(1)
-        expect(fsB.peers.size).to.equal(1)
-        done()
-      }
+      expect(fsA.peers.size).to.equal(1)
+      expect(fsB.peers.size).to.equal(1)
     })
 
-    it('stop both FloodSubs', (done) => {
-      parallel([
-        (cb) => fsA.stop(cb),
-        (cb) => fsB.stop(cb)
-      ], done)
+    it('stop both FloodSubs', () => {
+      fsA.stop()
+      fsB.stop()
     })
   })
 
@@ -399,57 +380,49 @@ describe('basics between 2 nodes', () => {
     let fsA
     let fsB
 
-    before((done) => {
+    before(async () => {
+      [nodeA, nodeB] = await Promise.all([
+        createNode(),
+        createNode()
+      ])
+
       sandbox = chai.spy.sandbox()
 
-      series([
-        (cb) => createNode(cb),
-        (cb) => createNode(cb)
-      ], (err, nodes) => {
-        if (err) return done(err)
+      // Put node B in node A's peer book
+      nodeA.peerBook.put(nodeB.peerInfo)
 
-        nodeA = nodes[0]
-        nodeB = nodes[1]
+      fsA = new FloodSub(nodeA)
+      fsB = new FloodSub(nodeB)
 
-        // Put node B in node A's peer book
-        nodeA.peerBook.put(nodeB.peerInfo)
-
-        fsA = new FloodSub(nodeA)
-        fsB = new FloodSub(nodeB)
-
-        fsB.start(done)
-      })
+      await fsB.start()
     })
 
-    after((done) => {
+    after(() => {
       sandbox.restore()
 
-      parallel([
-        (cb) => nodeA.stop(cb),
-        (cb) => nodeB.stop(cb)
-      ], (ignoreErr) => {
-        done()
-      })
+      return Promise.all([
+        nodeA.stop(),
+        nodeB.stop()
+      ])
     })
 
-    it('does not dial twice to same peer', (done) => {
+    it('does not dial twice to same peer', async () => {
       sandbox.on(fsA, ['_onDial'])
-
       // When node A starts, it will dial all peers in its peer book, which
       // is just peer B
-      fsA.start(startComplete)
+      await fsA.start()
 
       // Simulate a connection coming in from peer B at the same time. This
       // causes floodsub to dial peer B
       nodeA.emit('peer:connect', nodeB.peerInfo)
 
-      function startComplete () {
+      return new Promise((resolve) => {
         // Check that only one dial was made
         setTimeout(() => {
           expect(fsA._onDial).to.have.been.called.once()
-          done()
+          resolve()
         }, 1000)
-      }
+      })
     })
   })
 
@@ -460,42 +433,36 @@ describe('basics between 2 nodes', () => {
     let fsA
     let fsB
 
-    before((done) => {
+    before(async () => {
+      [nodeA, nodeB] = await Promise.all([
+        createNode(),
+        createNode()
+      ])
+
       sandbox = chai.spy.sandbox()
 
-      series([
-        (cb) => createNode(cb),
-        (cb) => createNode(cb)
-      ], (err, nodes) => {
-        if (err) return done(err)
+      // Put node B in node A's peer book
+      nodeA.peerBook.put(nodeB.peerInfo)
 
-        nodeA = nodes[0]
-        nodeB = nodes[1]
+      fsA = new FloodSub(nodeA)
+      fsB = new FloodSub(nodeB)
 
-        // Put node B in node A's peer book
-        nodeA.peerBook.put(nodeB.peerInfo)
-
-        fsA = new FloodSub(nodeA)
-        fsB = new FloodSub(nodeB)
-
-        fsB.start(done)
-      })
+      await fsB.start()
     })
 
-    after((done) => {
+    after(() => {
       sandbox.restore()
 
-      parallel([
-        (cb) => nodeA.stop(cb),
-        (cb) => nodeB.stop(cb)
-      ], (ignoreErr) => {
-        done()
-      })
+      return Promise.all([
+        nodeA.stop(),
+        nodeB.stop()
+      ])
     })
 
-    it('can dial again after error', (done) => {
+    it('can dial again after error', async () => {
       let firstTime = true
       const dialProtocol = fsA.libp2p.dialProtocol.bind(fsA.libp2p)
+
       sandbox.on(fsA.libp2p, 'dialProtocol', (peerInfo, multicodec, cb) => {
         // Return an error for the first dial
         if (firstTime) {
@@ -509,19 +476,19 @@ describe('basics between 2 nodes', () => {
 
       // When node A starts, it will dial all peers in its peer book, which
       // is just peer B
-      fsA.start(startComplete)
+      await fsA.start()
 
-      function startComplete () {
-        // Simulate a connection coming in from peer B. This causes floodsub
-        // to dial peer B
-        nodeA.emit('peer:connect', nodeB.peerInfo)
+      // Simulate a connection coming in from peer B. This causes floodsub
+      // to dial peer B
+      nodeA.emit('peer:connect', nodeB.peerInfo)
 
+      return new Promise((resolve) => {
         // Check that both dials were made
         setTimeout(() => {
           expect(fsA.libp2p.dialProtocol).to.have.been.called.twice()
-          done()
+          resolve()
         }, 1000)
-      }
+      })
     })
   })
 
@@ -532,40 +499,33 @@ describe('basics between 2 nodes', () => {
     let fsA
     let fsB
 
-    before((done) => {
+    before(async () => {
+      [nodeA, nodeB] = await Promise.all([
+        createNode(),
+        createNode()
+      ])
+
       sandbox = chai.spy.sandbox()
 
-      series([
-        (cb) => createNode(cb),
-        (cb) => createNode(cb)
-      ], (err, nodes) => {
-        if (err) return done(err)
+      fsA = new FloodSub(nodeA)
+      fsB = new FloodSub(nodeB)
 
-        nodeA = nodes[0]
-        nodeB = nodes[1]
-
-        fsA = new FloodSub(nodeA)
-        fsB = new FloodSub(nodeB)
-
-        parallel([
-          (cb) => fsA.start(cb),
-          (cb) => fsB.start(cb)
-        ], done)
-      })
+      await Promise.all([
+        fsA.start(),
+        fsB.start()
+      ])
     })
 
-    after((done) => {
+    after(() => {
       sandbox.restore()
 
-      parallel([
-        (cb) => nodeA.stop(cb),
-        (cb) => nodeB.stop(cb)
-      ], (ignoreErr) => {
-        done()
-      })
+      return Promise.all([
+        nodeA.stop(),
+        nodeB.stop()
+      ])
     })
 
-    it('does not process dial after stop', (done) => {
+    it('does not process dial after stop', () => {
       sandbox.on(fsA, ['_onDial'])
 
       // Simulate a connection coming in from peer B at the same time. This
@@ -573,11 +533,13 @@ describe('basics between 2 nodes', () => {
       nodeA.emit('peer:connect', nodeB.peerInfo)
 
       // Stop floodsub before the dial can complete
-      fsA.stop(() => {
+      fsA.stop()
+
+      return new Promise((resolve) => {
         // Check that the dial was not processed
         setTimeout(() => {
           expect(fsA._onDial).to.not.have.been.called()
-          done()
+          resolve()
         }, 1000)
       })
     })

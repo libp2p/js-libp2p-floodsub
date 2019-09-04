@@ -6,7 +6,6 @@ const chai = require('chai')
 chai.use(require('dirty-chai'))
 const expect = chai.expect
 const sinon = require('sinon')
-const nextTick = require('async/nextTick')
 
 const Floodsub = require('../src')
 const { createNode } = require('./utils')
@@ -16,82 +15,70 @@ describe('pubsub', () => {
   let floodsub
   let libp2p
 
-  before((done) => {
+  before(async () => {
     expect(Floodsub.multicodec).to.exist()
 
-    createNode((err, node) => {
-      expect(err).to.not.exist()
-      libp2p = node
-      floodsub = new Floodsub(libp2p, { emitSelf: true })
-      done(err)
-    })
+    libp2p = await createNode()
+    floodsub = new Floodsub(libp2p, { emitSelf: true })
   })
 
-  beforeEach(done => {
-    floodsub.start(done)
+  beforeEach(() => {
+    return floodsub.start()
   })
 
-  afterEach(done => {
+  afterEach(() => {
     sinon.restore()
-    floodsub.stop(done)
+    floodsub.stop()
   })
 
   describe('publish', () => {
-    it('should emit non normalized messages', (done) => {
+    it('should emit non normalized messages', async () => {
       sinon.spy(floodsub, '_emitMessages')
       sinon.spy(utils, 'randomSeqno')
 
       const topic = 'my-topic'
       const message = Buffer.from('a neat message')
 
-      floodsub.publish(topic, message, (err) => {
-        expect(err).to.not.exist()
-        expect(floodsub._emitMessages.callCount).to.eql(1)
+      await floodsub.publish(topic, message)
+      expect(floodsub._emitMessages.callCount).to.eql(1)
 
-        const [topics, messages] = floodsub._emitMessages.getCall(0).args
-        expect(topics).to.eql([topic])
-        expect(messages).to.eql([{
-          from: libp2p.peerInfo.id.toB58String(),
-          data: message,
-          seqno: utils.randomSeqno.getCall(0).returnValue,
-          topicIDs: topics
-        }])
-        done()
-      })
+      const [topics, messages] = floodsub._emitMessages.getCall(0).args
+      expect(topics).to.eql([topic])
+      expect(messages).to.eql([{
+        from: libp2p.peerInfo.id.toB58String(),
+        data: message,
+        seqno: utils.randomSeqno.getCall(0).returnValue,
+        topicIDs: topics
+      }])
     })
 
-    it('should forward normalized messages', (done) => {
+    it('should forward normalized messages', async () => {
       sinon.spy(floodsub, '_forwardMessages')
       sinon.spy(utils, 'randomSeqno')
 
       const topic = 'my-topic'
       const message = Buffer.from('a neat message')
 
-      floodsub.publish(topic, message, (err) => {
-        expect(err).to.not.exist()
-        expect(floodsub._forwardMessages.callCount).to.eql(1)
-        const [topics, messages] = floodsub._forwardMessages.getCall(0).args
+      await floodsub.publish(topic, message)
+      expect(floodsub._forwardMessages.callCount).to.eql(1)
+      const [topics, messages] = floodsub._forwardMessages.getCall(0).args
 
-        floodsub._buildMessage({
-          from: libp2p.peerInfo.id.toB58String(),
-          data: message,
-          seqno: utils.randomSeqno.getCall(0).returnValue,
-          topicIDs: topics
-        }, (err, expected) => {
-          expect(err).to.not.exist()
-
-          expect(topics).to.eql([topic])
-          expect(messages).to.eql([
-            expected
-          ])
-          done()
-        })
+      const expected = await floodsub._buildMessage({
+        from: libp2p.peerInfo.id.toB58String(),
+        data: message,
+        seqno: utils.randomSeqno.getCall(0).returnValue,
+        topicIDs: topics
       })
+
+      expect(topics).to.eql([topic])
+      expect(messages).to.eql([
+        expected
+      ])
     })
   })
 
   describe('validate', () => {
-    it('should drop unsigned messages', (done) => {
+    it('should drop unsigned messages', () => {
       sinon.spy(floodsub, '_emitMessages')
       sinon.spy(floodsub, '_forwardMessages')
       sinon.spy(floodsub, 'validate')
@@ -109,16 +96,18 @@ describe('pubsub', () => {
 
       floodsub._onRpc('QmAnotherPeer', rpc)
 
-      nextTick(() => {
-        expect(floodsub.validate.callCount).to.eql(1)
-        expect(floodsub._emitMessages.called).to.eql(false)
-        expect(floodsub._forwardMessages.called).to.eql(false)
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          expect(floodsub.validate.callCount).to.eql(1)
+          expect(floodsub._emitMessages.called).to.eql(false)
+          expect(floodsub._forwardMessages.called).to.eql(false)
 
-        done()
+          resolve()
+        }, 50)
       })
     })
 
-    it('should not drop unsigned messages if strict signing is disabled', (done) => {
+    it('should not drop unsigned messages if strict signing is disabled', () => {
       sinon.spy(floodsub, '_emitMessages')
       sinon.spy(floodsub, '_forwardMessages')
       sinon.spy(floodsub, 'validate')
@@ -137,12 +126,14 @@ describe('pubsub', () => {
 
       floodsub._onRpc('QmAnotherPeer', rpc)
 
-      nextTick(() => {
-        expect(floodsub.validate.callCount).to.eql(1)
-        expect(floodsub._emitMessages.called).to.eql(true)
-        expect(floodsub._forwardMessages.called).to.eql(true)
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          expect(floodsub.validate.callCount).to.eql(1)
+          expect(floodsub._emitMessages.called).to.eql(true)
+          expect(floodsub._forwardMessages.called).to.eql(true)
 
-        done()
+          resolve()
+        }, 50)
       })
     })
   })

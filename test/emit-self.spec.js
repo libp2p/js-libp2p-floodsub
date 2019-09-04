@@ -6,7 +6,6 @@ const chai = require('chai')
 chai.use(require('dirty-chai'))
 chai.use(require('chai-spies'))
 const expect = chai.expect
-const series = require('async/series')
 
 const FloodSub = require('../src')
 
@@ -23,38 +22,31 @@ describe('emit self', () => {
     let nodeA
     let fsA
 
-    before((done) => {
-      createNode((err, node) => {
-        if (err) {
-          return done(err)
-        }
-        nodeA = node
-        nodeA.start(done)
-      })
+    before(async () => {
+      nodeA = await createNode()
+      await nodeA.start()
     })
 
-    before((done) => {
+    before(() => {
       fsA = new FloodSub(nodeA, { emitSelf: true })
-      fsA.start(done)
+      return fsA.start()
     })
 
     before(() => {
       fsA.subscribe(topic)
     })
 
-    after((done) => {
-      series([
-        (cb) => fsA.stop(cb),
-        (cb) => nodeA.stop(cb)
-      ], done)
+    after(() => {
+      fsA.stop()
+      return nodeA.stop()
     })
 
-    it('should emit to self on publish', async () => {
+    it('should emit to self on publish', () => {
       const promise = new Promise((resolve) => fsA.once(topic, resolve))
 
       fsA.publish(topic, Buffer.from('hey'))
 
-      await promise
+      return promise
     })
   })
 
@@ -62,39 +54,32 @@ describe('emit self', () => {
     let nodeA
     let fsA
 
-    before((done) => {
-      createNode((err, node) => {
-        if (err) {
-          return done(err)
-        }
-        nodeA = node
-        nodeA.start(done)
-      })
+    before(async () => {
+      nodeA = await createNode()
+      await nodeA.start()
     })
 
-    before((done) => {
+    before(() => {
       fsA = new FloodSub(nodeA, { emitSelf: false })
-      fsA.start(done)
+      return fsA.start()
     })
 
     before(() => {
       fsA.subscribe(topic)
     })
 
-    after((done) => {
-      series([
-        (cb) => fsA.stop(cb),
-        (cb) => nodeA.stop(cb)
-      ], done)
+    after(() => {
+      fsA.stop()
+      return nodeA.stop()
     })
 
-    it('should emit to self on publish', async () => {
+    it('should emit to self on publish', () => {
       fsA.once(topic, (m) => shouldNotHappen)
 
       fsA.publish(topic, Buffer.from('hey'))
 
       // Wait 1 second to guarantee that self is not noticed
-      await new Promise((resolve) => setTimeout(() => resolve(), 1000))
+      return new Promise((resolve) => setTimeout(() => resolve(), 1000))
     })
   })
 })
