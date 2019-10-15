@@ -8,18 +8,22 @@ const expect = chai.expect
 const sinon = require('sinon')
 
 const Floodsub = require('../src')
-const { createNode } = require('./utils')
+const { createPeerInfo, mockRegistrar } = require('./utils')
 const { utils } = require('libp2p-pubsub')
+
+const defOptions = {
+  emitSelf: true
+}
 
 describe('pubsub', () => {
   let floodsub
-  let libp2p
+  let peerInfo
 
   before(async () => {
     expect(Floodsub.multicodec).to.exist()
 
-    libp2p = await createNode()
-    floodsub = new Floodsub(libp2p, { emitSelf: true })
+    peerInfo = await createPeerInfo()
+    floodsub = new Floodsub(peerInfo, mockRegistrar, defOptions)
   })
 
   beforeEach(() => {
@@ -28,7 +32,7 @@ describe('pubsub', () => {
 
   afterEach(() => {
     sinon.restore()
-    floodsub.stop()
+    return floodsub.stop()
   })
 
   describe('publish', () => {
@@ -45,7 +49,7 @@ describe('pubsub', () => {
       const [topics, messages] = floodsub._emitMessages.getCall(0).args
       expect(topics).to.eql([topic])
       expect(messages).to.eql([{
-        from: libp2p.peerInfo.id.toB58String(),
+        from: peerInfo.id.toB58String(),
         data: message,
         seqno: utils.randomSeqno.getCall(0).returnValue,
         topicIDs: topics
@@ -64,7 +68,7 @@ describe('pubsub', () => {
       const [topics, messages] = floodsub._forwardMessages.getCall(0).args
 
       const expected = await floodsub._buildMessage({
-        from: libp2p.peerInfo.id.toB58String(),
+        from: peerInfo.id.toB58String(),
         data: message,
         seqno: utils.randomSeqno.getCall(0).returnValue,
         topicIDs: topics
@@ -87,7 +91,7 @@ describe('pubsub', () => {
       const rpc = {
         subscriptions: [],
         msgs: [{
-          from: libp2p.peerInfo.id.id,
+          from: peerInfo.id.id,
           data: Buffer.from('an unsigned message'),
           seqno: utils.randomSeqno(),
           topicIDs: [topic]
@@ -117,7 +121,7 @@ describe('pubsub', () => {
       const rpc = {
         subscriptions: [],
         msgs: [{
-          from: libp2p.peerInfo.id.id,
+          from: peerInfo.id.id,
           data: Buffer.from('an unsigned message'),
           seqno: utils.randomSeqno(),
           topicIDs: [topic]

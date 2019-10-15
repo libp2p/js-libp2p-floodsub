@@ -2,10 +2,8 @@
 
 const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
-const Node = require('./nodejs-bundle')
 
-const waterfall = require('async/waterfall')
-const expect = require('chai').expect
+const { expect } = require('chai')
 
 exports.first = (map) => map.values().next().value
 
@@ -13,21 +11,17 @@ exports.expectSet = (set, subs) => {
   expect(Array.from(set.values())).to.eql(subs)
 }
 
-exports.createNode = () => {
-  return new Promise((resolve, reject) => {
-    waterfall([
-      (cb) => PeerId.create({ bits: 1024 }, cb),
-      (id, cb) => PeerInfo.create(id, cb),
-      (peerInfo, cb) => {
-        cb(null, new Node({ peerInfo }))
-      },
-      (node, cb) => node.start((err) => cb(err, node))
-    ], (err, node) => {
-      if (err) {
-        return reject(err)
-      }
+exports.createPeerInfo = async () => {
+  const peerId = await PeerId.create({ bits: 1024 })
 
-      resolve(node)
-    })
-  })
+  return PeerInfo.create(peerId)
+}
+
+exports.mockRegistrar = {
+  register: (multicodecs, handlers) => {
+
+  },
+  unregister: (multicodecs) => {
+
+  }
 }

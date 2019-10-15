@@ -6,13 +6,19 @@ const chai = require('chai')
 chai.use(require('dirty-chai'))
 const expect = chai.expect
 
-const isNode = require('detect-node')
+const pDefer = require('p-defer')
+const DuplexPair = require('it-pair/duplex')
 
 const FloodSub = require('../src')
-const utils = require('./utils')
-const first = utils.first
-const createNode = utils.createNode
-const expectSet = utils.expectSet
+const { multicodec } = require('../src')
+const { createPeerInfo, first, expectSet } = require('./utils')
+
+async function spawnPubSubNode (peerInfo, reg) {
+  const ps = new FloodSub(peerInfo, reg, { emitSelf: true })
+
+  await ps.start()
+  return ps
+}
 
 describe('multiple nodes (more than 2)', () => {
   describe('every peer subscribes to the topic', () => {
@@ -20,147 +26,169 @@ describe('multiple nodes (more than 2)', () => {
       // line
       // ◉────◉────◉
       // a    b    c
-      let a
-      let b
-      let c
+      let psA, psB, psC
+      let peerInfoA, peerInfoB, peerInfoC
+
+      const registrarRecordA = {}
+      const registrarRecordB = {}
+      const registrarRecordC = {}
+
+      const registrar = (registrarRecord) => ({
+        register: (multicodec, handlers) => {
+          registrarRecord[multicodec] = handlers
+        },
+        unregister: (multicodec) => {
+          delete registrarRecord[multicodec]
+        }
+      })
 
       before(async () => {
-        [a, b, c] = await Promise.all([
-          spawnPubSubNode(),
-          spawnPubSubNode(),
-          spawnPubSubNode()
+        [peerInfoA, peerInfoB, peerInfoC] = await Promise.all([
+          createPeerInfo(),
+          createPeerInfo(),
+          createPeerInfo()
+        ]);
+
+        [psA, psB, psC] = await Promise.all([
+          spawnPubSubNode(peerInfoA, registrar(registrarRecordA)),
+          spawnPubSubNode(peerInfoB, registrar(registrarRecordB)),
+          spawnPubSubNode(peerInfoC, registrar(registrarRecordC))
         ])
       })
 
-      after(() => {
-        // note: setTimeout to avoid the tests finishing
-        // before swarm does its dials
-        return new Promise((resolve) => {
-          setTimeout(async () => {
-            await Promise.all([
-              a.libp2p.stop(),
-              b.libp2p.stop(),
-              c.libp2p.stop()
-            ])
-            resolve()
-          }, 1000)
-        })
+      // connect nodes
+      before(() => {
+        const onConnectA = registrarRecordA[multicodec].onConnect
+        const onConnectB = registrarRecordB[multicodec].onConnect
+        const onConnectC = registrarRecordC[multicodec].onConnect
+
+        // Notice peers of connection
+        const [d0, d1] = DuplexPair()
+        onConnectA(peerInfoB, d0)
+        onConnectB(peerInfoA, d1)
+
+        const [d2, d3] = DuplexPair()
+        onConnectB(peerInfoC, d2)
+        onConnectC(peerInfoB, d3)
       })
 
-      it('establish the connections', async () => {
-        await Promise.all([
-          a.libp2p.dial(b.libp2p.peerInfo),
-          b.libp2p.dial(c.libp2p.peerInfo)
-        ])
-
-        // wait for the pubsub pipes to be established
-        return new Promise((resolve) => setTimeout(resolve, 1000))
-      })
+      after(() => Promise.all([
+        psA.stop(),
+        psB.stop(),
+        psC.stop()
+      ]))
 
       it('subscribe to the topic on node a', () => {
-        a.ps.subscribe('Z')
-        expectSet(a.ps.subscriptions, ['Z'])
+        const defer = pDefer()
 
-        return new Promise((resolve) => {
-          b.ps.once('floodsub:subscription-change', () => {
-            expect(b.ps.peers.size).to.equal(2)
-            const aPeerId = a.libp2p.peerInfo.id.toB58String()
-            const topics = b.ps.peers.get(aPeerId).topics
-            expectSet(topics, ['Z'])
+        psA.subscribe('Z')
+        expectSet(psA.subscriptions, ['Z'])
 
-            expect(c.ps.peers.size).to.equal(1)
-            expectSet(first(c.ps.peers).topics, [])
+        psB.once('floodsub:subscription-change', () => {
+          expect(psB.peers.size).to.equal(2)
+          const aPeerId = psA.peerInfo.id.toB58String()
+          const topics = psB.peers.get(aPeerId).topics
+          expectSet(topics, ['Z'])
 
-            resolve()
-          })
+          expect(psC.peers.size).to.equal(1)
+          expectSet(first(psC.peers).topics, [])
+
+          defer.resolve()
         })
+
+        return defer.promise
       })
 
       it('subscribe to the topic on node b', async () => {
-        b.ps.subscribe('Z')
-        expectSet(b.ps.subscriptions, ['Z'])
+        psB.subscribe('Z')
+        expectSet(psB.subscriptions, ['Z'])
 
         await Promise.all([
-          new Promise((resolve) => a.ps.once('floodsub:subscription-change', resolve)),
-          new Promise((resolve) => c.ps.once('floodsub:subscription-change', resolve))
+          new Promise((resolve) => psA.once('floodsub:subscription-change', resolve)),
+          new Promise((resolve) => psC.once('floodsub:subscription-change', resolve))
         ])
 
-        expect(a.ps.peers.size).to.equal(1)
-        expectSet(first(a.ps.peers).topics, ['Z'])
+        expect(psA.peers.size).to.equal(1)
+        expectSet(first(psA.peers).topics, ['Z'])
 
-        expect(c.ps.peers.size).to.equal(1)
-        expectSet(first(c.ps.peers).topics, ['Z'])
+        expect(psC.peers.size).to.equal(1)
+        expectSet(first(psC.peers).topics, ['Z'])
       })
 
       it('subscribe to the topic on node c', () => {
-        c.ps.subscribe('Z')
-        expectSet(c.ps.subscriptions, ['Z'])
+        const defer = pDefer()
 
-        return new Promise((resolve) => {
-          b.ps.once('floodsub:subscription-change', () => {
-            expect(a.ps.peers.size).to.equal(1)
-            expectSet(first(a.ps.peers).topics, ['Z'])
+        psC.subscribe('Z')
+        expectSet(psC.subscriptions, ['Z'])
 
-            expect(b.ps.peers.size).to.equal(2)
-            b.ps.peers.forEach((peer) => {
-              expectSet(peer.topics, ['Z'])
-            })
+        psB.once('floodsub:subscription-change', () => {
+          expect(psA.peers.size).to.equal(1)
+          expectSet(first(psA.peers).topics, ['Z'])
 
-            resolve()
+          expect(psB.peers.size).to.equal(2)
+          psB.peers.forEach((peer) => {
+            expectSet(peer.topics, ['Z'])
           })
+
+          defer.resolve()
         })
+
+        return defer.promise
       })
 
       it('publish on node a', () => {
+        const defer = pDefer()
+
         let counter = 0
 
-        return new Promise((resolve) => {
-          a.ps.on('Z', incMsg)
-          b.ps.on('Z', incMsg)
-          c.ps.on('Z', incMsg)
+        psA.on('Z', incMsg)
+        psB.on('Z', incMsg)
+        psC.on('Z', incMsg)
 
-          a.ps.publish('Z', Buffer.from('hey'))
+        psA.publish('Z', Buffer.from('hey'))
 
-          function incMsg (msg) {
-            expect(msg.data.toString()).to.equal('hey')
-            check()
+        function incMsg (msg) {
+          expect(msg.data.toString()).to.equal('hey')
+          check()
+        }
+
+        function check () {
+          if (++counter === 3) {
+            psA.removeListener('Z', incMsg)
+            psB.removeListener('Z', incMsg)
+            psC.removeListener('Z', incMsg)
+            defer.resolve()
           }
+        }
 
-          function check () {
-            if (++counter === 3) {
-              a.ps.removeListener('Z', incMsg)
-              b.ps.removeListener('Z', incMsg)
-              c.ps.removeListener('Z', incMsg)
-              resolve()
-            }
-          }
-        })
+        return defer.promise
       })
 
       it('publish array on node a', () => {
+        const defer = pDefer()
         let counter = 0
 
-        return new Promise((resolve) => {
-          a.ps.on('Z', incMsg)
-          b.ps.on('Z', incMsg)
-          c.ps.on('Z', incMsg)
+        psA.on('Z', incMsg)
+        psB.on('Z', incMsg)
+        psC.on('Z', incMsg)
 
-          a.ps.publish('Z', [Buffer.from('hey'), Buffer.from('hey')])
+        psA.publish('Z', [Buffer.from('hey'), Buffer.from('hey')])
 
-          function incMsg (msg) {
-            expect(msg.data.toString()).to.equal('hey')
-            check()
+        function incMsg (msg) {
+          expect(msg.data.toString()).to.equal('hey')
+          check()
+        }
+
+        function check () {
+          if (++counter === 6) {
+            psA.removeListener('Z', incMsg)
+            psB.removeListener('Z', incMsg)
+            psC.removeListener('Z', incMsg)
+            defer.resolve()
           }
+        }
 
-          function check () {
-            if (++counter === 6) {
-              a.ps.removeListener('Z', incMsg)
-              b.ps.removeListener('Z', incMsg)
-              c.ps.removeListener('Z', incMsg)
-              resolve()
-            }
-          }
-        })
+        return defer.promise
       })
 
       // since the topology is the same, just the publish
@@ -173,137 +201,157 @@ describe('multiple nodes (more than 2)', () => {
         //   a     c
 
         it('publish on node b', () => {
+          const defer = pDefer()
           let counter = 0
 
-          return new Promise((resolve) => {
-            a.ps.on('Z', incMsg)
-            b.ps.on('Z', incMsg)
-            c.ps.on('Z', incMsg)
+          psA.on('Z', incMsg)
+          psB.on('Z', incMsg)
+          psC.on('Z', incMsg)
 
-            b.ps.publish('Z', Buffer.from('hey'))
+          psB.publish('Z', Buffer.from('hey'))
 
-            function incMsg (msg) {
-              expect(msg.data.toString()).to.equal('hey')
-              check()
+          function incMsg (msg) {
+            expect(msg.data.toString()).to.equal('hey')
+            check()
+          }
+
+          function check () {
+            if (++counter === 3) {
+              psA.removeListener('Z', incMsg)
+              psB.removeListener('Z', incMsg)
+              psC.removeListener('Z', incMsg)
+              defer.resolve()
             }
+          }
 
-            function check () {
-              if (++counter === 3) {
-                a.ps.removeListener('Z', incMsg)
-                b.ps.removeListener('Z', incMsg)
-                c.ps.removeListener('Z', incMsg)
-                resolve()
-              }
-            }
-          })
+          return defer.promise
         })
       })
     })
 
-    if (isNode) {
-      // TODO enable for browser
-      describe('2 level tree', () => {
-        // 2 levels tree
-        //      ┌◉┐
-        //      │c│
-        //   ┌◉─┘ └─◉┐
-        //   │b     d│
-        // ◉─┘       └─◉
-        // a           e
+    describe('2 level tree', () => {
+      // 2 levels tree
+      //      ┌◉┐
+      //      │c│
+      //   ┌◉─┘ └─◉┐
+      //   │b     d│
+      // ◉─┘       └─◉
+      // a
+      let psA, psB, psC, psD, psE
+      let peerInfoA, peerInfoB, peerInfoC, peerInfoD, peerInfoE
 
-        let a
-        let b
-        let c
-        let d
-        let e
+      const registrarRecordA = {}
+      const registrarRecordB = {}
+      const registrarRecordC = {}
+      const registrarRecordD = {}
+      const registrarRecordE = {}
 
-        before(async () => {
-          [a, b, c, d, e] = await Promise.all([
-            spawnPubSubNode(),
-            spawnPubSubNode(),
-            spawnPubSubNode(),
-            spawnPubSubNode(),
-            spawnPubSubNode()
-          ])
-        })
-
-        after(() => {
-          // note: setTimeout to avoid the tests finishing
-          // before swarm does its dials
-          return new Promise((resolve) => {
-            setTimeout(async () => {
-              await Promise.all([
-                a.libp2p.stop(),
-                b.libp2p.stop(),
-                c.libp2p.stop(),
-                d.libp2p.stop(),
-                e.libp2p.stop()
-              ])
-
-              resolve()
-            }, 1000)
-          })
-        })
-
-        it('establish the connections', async function () {
-          this.timeout(30 * 1000)
-
-          await Promise.all([
-            a.libp2p.dial(b.libp2p.peerInfo),
-            b.libp2p.dial(c.libp2p.peerInfo),
-            c.libp2p.dial(d.libp2p.peerInfo),
-            d.libp2p.dial(e.libp2p.peerInfo)
-          ])
-
-          // wait for the pubsub pipes to be established
-          return new Promise((resolve) => setTimeout(resolve, 10000))
-        })
-
-        it('subscribes', () => {
-          a.ps.subscribe('Z')
-          expectSet(a.ps.subscriptions, ['Z'])
-          b.ps.subscribe('Z')
-          expectSet(b.ps.subscriptions, ['Z'])
-          c.ps.subscribe('Z')
-          expectSet(c.ps.subscriptions, ['Z'])
-          d.ps.subscribe('Z')
-          expectSet(d.ps.subscriptions, ['Z'])
-          e.ps.subscribe('Z')
-          expectSet(e.ps.subscriptions, ['Z'])
-        })
-
-        it('publishes from c', function () {
-          this.timeout(30 * 1000)
-          let counter = 0
-
-          return new Promise((resolve) => {
-            a.ps.on('Z', incMsg)
-            b.ps.on('Z', incMsg)
-            c.ps.on('Z', incMsg)
-            d.ps.on('Z', incMsg)
-            e.ps.on('Z', incMsg)
-
-            c.ps.publish('Z', Buffer.from('hey from c'))
-
-            function incMsg (msg) {
-              expect(msg.data.toString()).to.equal('hey from c')
-              check()
-            }
-
-            function check () {
-              if (++counter === 5) {
-                a.ps.removeListener('Z', incMsg)
-                b.ps.removeListener('Z', incMsg)
-                c.ps.removeListener('Z', incMsg)
-                d.ps.removeListener('Z', incMsg)
-                e.ps.removeListener('Z', incMsg)
-                resolve()
-              }
-            }
-          })
-        })
+      const registrar = (registrarRecord) => ({
+        register: (multicodec, handlers) => {
+          registrarRecord[multicodec] = handlers
+        },
+        unregister: (multicodec) => {
+          delete registrarRecord[multicodec]
+        }
       })
-    }
+
+      before(async () => {
+        [peerInfoA, peerInfoB, peerInfoC, peerInfoD, peerInfoE] = await Promise.all([
+          createPeerInfo(),
+          createPeerInfo(),
+          createPeerInfo(),
+          createPeerInfo(),
+          createPeerInfo()
+        ]);
+
+        [psA, psB, psC, psD, psE] = await Promise.all([
+          spawnPubSubNode(peerInfoA, registrar(registrarRecordA)),
+          spawnPubSubNode(peerInfoB, registrar(registrarRecordB)),
+          spawnPubSubNode(peerInfoC, registrar(registrarRecordC)),
+          spawnPubSubNode(peerInfoD, registrar(registrarRecordD)),
+          spawnPubSubNode(peerInfoE, registrar(registrarRecordE))
+        ])
+      })
+
+      // connect nodes
+      before(() => {
+        const onConnectA = registrarRecordA[multicodec].onConnect
+        const onConnectB = registrarRecordB[multicodec].onConnect
+        const onConnectC = registrarRecordC[multicodec].onConnect
+        const onConnectD = registrarRecordD[multicodec].onConnect
+        const onConnectE = registrarRecordE[multicodec].onConnect
+
+        // Notice peers of connection
+        const [d0, d1] = DuplexPair() // A <-> B
+        onConnectA(peerInfoB, d0)
+        onConnectB(peerInfoA, d1)
+
+        const [d2, d3] = DuplexPair() // B <-> C
+        onConnectB(peerInfoC, d2)
+        onConnectC(peerInfoB, d3)
+
+        const [d4, d5] = DuplexPair() // C <-> D
+        onConnectC(peerInfoD, d4)
+        onConnectD(peerInfoC, d5)
+
+        const [d6, d7] = DuplexPair() // C <-> D
+        onConnectD(peerInfoE, d6)
+        onConnectE(peerInfoD, d7)
+      })
+
+      after(() => Promise.all([
+        psA.stop(),
+        psB.stop(),
+        psC.stop(),
+        psD.stop(),
+        psE.stop()
+      ]))
+
+      it('subscribes', () => {
+        psA.subscribe('Z')
+        expectSet(psA.subscriptions, ['Z'])
+        psB.subscribe('Z')
+        expectSet(psB.subscriptions, ['Z'])
+        psC.subscribe('Z')
+        expectSet(psC.subscriptions, ['Z'])
+        psD.subscribe('Z')
+        expectSet(psD.subscriptions, ['Z'])
+        psE.subscribe('Z')
+        expectSet(psE.subscriptions, ['Z'])
+      })
+
+      it('publishes from c', function () {
+        this.timeout(30 * 1000)
+        const defer = pDefer()
+        let counter = 0
+
+        psA.on('Z', incMsg)
+        psB.on('Z', incMsg)
+        psC.on('Z', incMsg)
+        psD.on('Z', incMsg)
+        psE.on('Z', incMsg)
+
+        psC.publish('Z', Buffer.from('hey from c'))
+
+        function incMsg (msg) {
+          expect(msg.data.toString()).to.equal('hey from c')
+          check()
+        }
+
+        function check () {
+          if (++counter === 5) {
+            psA.removeListener('Z', incMsg)
+            psB.removeListener('Z', incMsg)
+            psC.removeListener('Z', incMsg)
+            psD.removeListener('Z', incMsg)
+            psE.removeListener('Z', incMsg)
+            defer.resolve()
+          }
+        }
+
+        return defer.promise
+      })
+    })
   })
 
   describe('only some nodes subscribe the networks', () => {
@@ -312,8 +360,8 @@ describe('multiple nodes (more than 2)', () => {
       // ◉────◎────◉
       // a    b    c
 
-      before((done) => {})
-      after((done) => {})
+      before(() => { })
+      after(() => { })
     })
 
     describe('1 level tree', () => {
@@ -323,8 +371,8 @@ describe('multiple nodes (more than 2)', () => {
       //   ◎─┘ └─◉
       //   a     c
 
-      before((done) => {})
-      after((done) => {})
+      before(() => { })
+      after(() => { })
     })
 
     describe('2 level tree', () => {
@@ -336,19 +384,8 @@ describe('multiple nodes (more than 2)', () => {
       // ◉─┘       └─◎
       // a           e
 
-      before((done) => {})
-      after((done) => {})
+      before(() => { })
+      after(() => { })
     })
   })
 })
-
-async function spawnPubSubNode () {
-  const node = await createNode()
-  const ps = new FloodSub(node, { emitSelf: true })
-
-  await ps.start()
-  return {
-    libp2p: node,
-    ps: ps
-  }
-}
