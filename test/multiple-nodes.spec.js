@@ -7,11 +7,16 @@ chai.use(require('dirty-chai'))
 const expect = chai.expect
 
 const pDefer = require('p-defer')
-const DuplexPair = require('it-pair/duplex')
 
 const FloodSub = require('../src')
 const { multicodec } = require('../src')
-const { createPeerInfo, first, expectSet } = require('./utils')
+const {
+  createPeerInfo,
+  createMockRegistrar,
+  first,
+  expectSet,
+  ConnectionPair
+} = require('./utils')
 
 async function spawnPubSubNode (peerInfo, reg) {
   const ps = new FloodSub(peerInfo, reg, { emitSelf: true })
@@ -33,15 +38,6 @@ describe('multiple nodes (more than 2)', () => {
       const registrarRecordB = {}
       const registrarRecordC = {}
 
-      const registrar = (registrarRecord) => ({
-        register: (multicodec, handlers) => {
-          registrarRecord[multicodec] = handlers
-        },
-        unregister: (multicodec) => {
-          delete registrarRecord[multicodec]
-        }
-      })
-
       before(async () => {
         [peerInfoA, peerInfoB, peerInfoC] = await Promise.all([
           createPeerInfo(),
@@ -50,26 +46,26 @@ describe('multiple nodes (more than 2)', () => {
         ]);
 
         [psA, psB, psC] = await Promise.all([
-          spawnPubSubNode(peerInfoA, registrar(registrarRecordA)),
-          spawnPubSubNode(peerInfoB, registrar(registrarRecordB)),
-          spawnPubSubNode(peerInfoC, registrar(registrarRecordC))
+          spawnPubSubNode(peerInfoA, createMockRegistrar(registrarRecordA)),
+          spawnPubSubNode(peerInfoB, createMockRegistrar(registrarRecordB)),
+          spawnPubSubNode(peerInfoC, createMockRegistrar(registrarRecordC))
         ])
       })
 
       // connect nodes
-      before(() => {
+      before(async () => {
         const onConnectA = registrarRecordA[multicodec].onConnect
         const onConnectB = registrarRecordB[multicodec].onConnect
         const onConnectC = registrarRecordC[multicodec].onConnect
 
         // Notice peers of connection
-        const [d0, d1] = DuplexPair()
-        onConnectA(peerInfoB, d0)
-        onConnectB(peerInfoA, d1)
+        const [d0, d1] = ConnectionPair()
+        await onConnectA(peerInfoB, d0)
+        await onConnectB(peerInfoA, d1)
 
-        const [d2, d3] = DuplexPair()
-        onConnectB(peerInfoC, d2)
-        onConnectC(peerInfoB, d3)
+        const [d2, d3] = ConnectionPair()
+        await onConnectB(peerInfoC, d2)
+        await onConnectC(peerInfoB, d3)
       })
 
       after(() => Promise.all([
@@ -246,15 +242,6 @@ describe('multiple nodes (more than 2)', () => {
       const registrarRecordD = {}
       const registrarRecordE = {}
 
-      const registrar = (registrarRecord) => ({
-        register: (multicodec, handlers) => {
-          registrarRecord[multicodec] = handlers
-        },
-        unregister: (multicodec) => {
-          delete registrarRecord[multicodec]
-        }
-      })
-
       before(async () => {
         [peerInfoA, peerInfoB, peerInfoC, peerInfoD, peerInfoE] = await Promise.all([
           createPeerInfo(),
@@ -265,16 +252,16 @@ describe('multiple nodes (more than 2)', () => {
         ]);
 
         [psA, psB, psC, psD, psE] = await Promise.all([
-          spawnPubSubNode(peerInfoA, registrar(registrarRecordA)),
-          spawnPubSubNode(peerInfoB, registrar(registrarRecordB)),
-          spawnPubSubNode(peerInfoC, registrar(registrarRecordC)),
-          spawnPubSubNode(peerInfoD, registrar(registrarRecordD)),
-          spawnPubSubNode(peerInfoE, registrar(registrarRecordE))
+          spawnPubSubNode(peerInfoA, createMockRegistrar(registrarRecordA)),
+          spawnPubSubNode(peerInfoB, createMockRegistrar(registrarRecordB)),
+          spawnPubSubNode(peerInfoC, createMockRegistrar(registrarRecordC)),
+          spawnPubSubNode(peerInfoD, createMockRegistrar(registrarRecordD)),
+          spawnPubSubNode(peerInfoE, createMockRegistrar(registrarRecordE))
         ])
       })
 
       // connect nodes
-      before(() => {
+      before(async () => {
         const onConnectA = registrarRecordA[multicodec].onConnect
         const onConnectB = registrarRecordB[multicodec].onConnect
         const onConnectC = registrarRecordC[multicodec].onConnect
@@ -282,21 +269,21 @@ describe('multiple nodes (more than 2)', () => {
         const onConnectE = registrarRecordE[multicodec].onConnect
 
         // Notice peers of connection
-        const [d0, d1] = DuplexPair() // A <-> B
-        onConnectA(peerInfoB, d0)
-        onConnectB(peerInfoA, d1)
+        const [d0, d1] = ConnectionPair() // A <-> B
+        await onConnectA(peerInfoB, d0)
+        await onConnectB(peerInfoA, d1)
 
-        const [d2, d3] = DuplexPair() // B <-> C
-        onConnectB(peerInfoC, d2)
-        onConnectC(peerInfoB, d3)
+        const [d2, d3] = ConnectionPair() // B <-> C
+        await onConnectB(peerInfoC, d2)
+        await onConnectC(peerInfoB, d3)
 
-        const [d4, d5] = DuplexPair() // C <-> D
-        onConnectC(peerInfoD, d4)
-        onConnectD(peerInfoC, d5)
+        const [d4, d5] = ConnectionPair() // C <-> D
+        await onConnectC(peerInfoD, d4)
+        await onConnectD(peerInfoC, d5)
 
-        const [d6, d7] = DuplexPair() // C <-> D
-        onConnectD(peerInfoE, d6)
-        onConnectE(peerInfoD, d7)
+        const [d6, d7] = ConnectionPair() // C <-> D
+        await onConnectD(peerInfoE, d6)
+        await onConnectE(peerInfoD, d7)
       })
 
       after(() => Promise.all([

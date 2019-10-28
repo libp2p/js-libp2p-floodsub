@@ -50,13 +50,14 @@
     "dirty-chai": "^2.0.1",
     "it-pair": "^1.0.0",
     "lodash": "^4.17.15",
-    "multiaddr": "^6.1.0",
+    "multiaddr": "^7.1.0",
     "p-defer": "^3.0.0",
     "peer-id": "~0.13.3",
     "peer-info": "~0.17.0",
     "sinon": "^7.5.0"
   },
   "dependencies": {
+    "async.nexttick": "^0.5.2",
     "debug": "^4.1.1",
     "it-length-prefixed": "^2.0.0",
     "it-pipe": "^1.0.1",

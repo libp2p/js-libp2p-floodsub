@@ -2,6 +2,7 @@
 
 const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
+const DuplexPair = require('it-pair/duplex')
 
 const { expect } = require('chai')
 
@@ -18,10 +19,50 @@ exports.createPeerInfo = async () => {
 }
 
 exports.mockRegistrar = {
-  register: (multicodecs, handlers) => {
+  handle: () => {},
+  register: () => {},
+  unregister: () => {}
+}
 
+exports.createMockRegistrar = (registrarRecord) => ({
+  handle: (multicodecs, handler) => {
+    const rec = registrarRecord[multicodecs[0]] || {}
+
+    registrarRecord[multicodecs[0]] = {
+      ...rec,
+      handler
+    }
   },
-  unregister: (multicodecs) => {
+  register: ({ multicodecs, handlers }) => {
+    const rec = registrarRecord[multicodecs[0]] || {}
 
+    registrarRecord[multicodecs[0]] = {
+      ...rec,
+      ...handlers
+    }
+
+    return multicodecs[0]
+  },
+  unregister: (id) => {
+    delete registrarRecord[id]
   }
+})
+
+exports.ConnectionPair = () => {
+  const [d0, d1] = DuplexPair()
+
+  return [
+    {
+      stream: d0,
+      newStream: () => Promise.resolve({ stream: d0 })
+    },
+    {
+      stream: d1,
+      newStream: () => Promise.resolve({ stream: d1 })
+    }
+  ]
+}
+
+exports.defOptions = {
+  emitSelf: true
 }

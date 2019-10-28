@@ -9,15 +9,17 @@ const expect = chai.expect
 
 const pDefer = require('p-defer')
 const times = require('lodash/times')
-const DuplexPair = require('it-pair/duplex')
 
 const FloodSub = require('../src')
 const { multicodec } = require('../src')
-const { first, createPeerInfo, expectSet } = require('./utils')
-
-const defOptions = {
-  emitSelf: true
-}
+const {
+  defOptions,
+  first,
+  createPeerInfo,
+  createMockRegistrar,
+  expectSet,
+  ConnectionPair
+} = require('./utils')
 
 function shouldNotHappen (_) {
   expect.fail()
@@ -31,15 +33,6 @@ describe('basics between 2 nodes', () => {
     const registrarRecordA = {}
     const registrarRecordB = {}
 
-    const registrar = (registrarRecord) => ({
-      register: (multicodecs, handlers) => {
-        registrarRecord[multicodecs[0]] = handlers
-      },
-      unregister: (multicodecs) => {
-        delete registrarRecord[multicodecs[0]]
-      }
-    })
-
     // Mount pubsub protocol
     before(async () => {
       [peerInfoA, peerInfoB] = await Promise.all([
@@ -47,8 +40,8 @@ describe('basics between 2 nodes', () => {
         createPeerInfo()
       ])
 
-      fsA = new FloodSub(peerInfoA, registrar(registrarRecordA), defOptions)
-      fsB = new FloodSub(peerInfoB, registrar(registrarRecordB), defOptions)
+      fsA = new FloodSub(peerInfoA, createMockRegistrar(registrarRecordA), defOptions)
+      fsB = new FloodSub(peerInfoB, createMockRegistrar(registrarRecordB), defOptions)
 
       expect(fsA.peers.size).to.be.eql(0)
       expect(fsA.subscriptions.size).to.eql(0)
@@ -63,14 +56,19 @@ describe('basics between 2 nodes', () => {
     ]))
 
     // Connect floodsub nodes
-    before(() => {
+    before(async () => {
       const onConnectA = registrarRecordA[multicodec].onConnect
-      const onConnectB = registrarRecordB[multicodec].onConnect
+      const handleB = registrarRecordB[multicodec].handler
 
       // Notice peers of connection
-      const [d0, d1] = DuplexPair()
-      onConnectA(peerInfoB, d0)
-      onConnectB(peerInfoA, d1)
+      const [c0, c1] = ConnectionPair()
+      await onConnectA(peerInfoB, c0)
+
+      await handleB({
+        protocol: multicodec,
+        stream: c1.stream,
+        remotePeer: peerInfoA.id
+      })
 
       expect(fsA.peers.size).to.be.eql(1)
       expect(fsB.peers.size).to.be.eql(1)
@@ -236,15 +234,6 @@ describe('basics between 2 nodes', () => {
     const registrarRecordA = {}
     const registrarRecordB = {}
 
-    const registrar = (registrarRecord) => ({
-      register: (multicodec, handlers) => {
-        registrarRecord[multicodec] = handlers
-      },
-      unregister: (multicodec) => {
-        delete registrarRecord[multicodec]
-      }
-    })
-
     // Mount pubsub protocol
     before(async () => {
       [peerInfoA, peerInfoB] = await Promise.all([
@@ -252,8 +241,8 @@ describe('basics between 2 nodes', () => {
         createPeerInfo()
       ])
 
-      fsA = new FloodSub(peerInfoA, registrar(registrarRecordA), defOptions)
-      fsB = new FloodSub(peerInfoB, registrar(registrarRecordB), defOptions)
+      fsA = new FloodSub(peerInfoA, createMockRegistrar(registrarRecordA), defOptions)
+      fsB = new FloodSub(peerInfoB, createMockRegistrar(registrarRecordB), defOptions)
     })
 
     // Start pubsub
@@ -281,19 +270,18 @@ describe('basics between 2 nodes', () => {
     })
 
     it('existing subscriptions are sent upon peer connection', async () => {
+      const dial = async () => {
+        const onConnectA = registrarRecordA[multicodec].onConnect
+        const onConnectB = registrarRecordB[multicodec].onConnect
+
+        // Notice peers of connection
+        const [c0, c1] = ConnectionPair()
+        await onConnectA(peerInfoB, c0)
+        await onConnectB(peerInfoA, c1)
+      }
+
       await Promise.all([
-        // nodeA.dial(nodeB.peerInfo),
-        new Promise((resolve) => {
-          const onConnectA = registrarRecordA[multicodec].onConnect
-          const onConnectB = registrarRecordB[multicodec].onConnect
-
-          // Notice peers of connection
-          const [d0, d1] = DuplexPair()
-          onConnectA(peerInfoB, d0)
-          onConnectB(peerInfoA, d1)
-
-          resolve()
-        }),
+        dial(),
         new Promise((resolve) => fsA.once('floodsub:subscription-change', resolve)),
         new Promise((resolve) => fsB.once('floodsub:subscription-change', resolve))
       ])

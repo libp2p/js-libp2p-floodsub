@@ -38,11 +38,14 @@ js-libp2p-floodsub
 const FloodSub = require('libp2p-floodsub')
 
 const registrar = {
-  register: (multicodec, handlers) => {
+  handle: (multicodecs, handle) => {
     // register multicodec to libp2p
+    // handle function is called everytime a remote peer opens a stream to the peer.
+  },
+  register: (multicodecs, handlers) => {
     // handlers will be used to notify pubsub of peer connection establishment or closing
   },
-  unregister: (multicodec) => {
+  unregister: (id) => {
 
   }
 }
@@ -99,4 +102,4 @@ This repository falls under the IPFS [Code of Conduct](https://github.com/ipfs/c
 
 ## License
 
-MIT © David Dias
+Copyright (c) Protocol Labs, Inc. under the **MIT License**. See [LICENSE file](./LICENSE) for details.

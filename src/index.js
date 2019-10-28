@@ -10,6 +10,7 @@ const pipe = require('it-pipe')
 const lp = require('it-length-prefixed')
 const pMap = require('p-map')
 const TimeCache = require('time-cache')
+const nextTick = require('async.nexttick')
 
 const PeerInfo = require('peer-info')
 const BaseProtocol = require('libp2p-pubsub')
@@ -27,6 +28,7 @@ class FloodSub extends BaseProtocol {
   /**
    * @param {PeerInfo} peerInfo instance of the peer's PeerInfo
    * @param {Object} registrar
+   * @param {function} registrar.handle
    * @param {function} registrar.register
    * @param {function} registrar.unregister
    * @param {Object} [options]
@@ -37,6 +39,7 @@ class FloodSub extends BaseProtocol {
     assert(PeerInfo.isPeerInfo(peerInfo), 'peer info must be an instance of `peer-info`')
 
     // registrar handling
+    assert(registrar && typeof registrar.handle === 'function', 'a handle function must be provided in registrar')
     assert(registrar && typeof registrar.register === 'function', 'a register function must be provided in registrar')
     assert(registrar && typeof registrar.unregister === 'function', 'a unregister function must be provided in registrar')
 
@@ -77,9 +80,10 @@ class FloodSub extends BaseProtocol {
    * @override
    * @param {PeerInfo} peerInfo peer info
    * @param {Connection} conn connection to the peer
+   * @returns {Promise<void>}
    */
-  _onPeerConnected (peerInfo, conn) {
-    super._onPeerConnected(peerInfo, conn)
+  async _onPeerConnected (peerInfo, conn) {
+    await super._onPeerConnected(peerInfo, conn)
     const idB58Str = peerInfo.id.toB58String()
     const peer = this.peers.get(idB58Str)
 
@@ -105,7 +109,7 @@ class FloodSub extends BaseProtocol {
       await pipe(
         conn,
         lp.decode(),
-        async function collect (source) {
+        async function (source) {
           for await (const data of source) {
             const rpc = Buffer.isBuffer(data) ? data : data.slice()
 
@@ -209,7 +213,7 @@ class FloodSub extends BaseProtocol {
   /**
    * Unmounts the floodsub protocol and shuts down every connection
    * @override
-   * @returns {Promise}
+   * @returns {Promise<void>}
    */
   async stop () {
     await super.stop()
@@ -222,7 +226,7 @@ class FloodSub extends BaseProtocol {
    * @override
    * @param {Array<string>|string} topics
    * @param {Array<any>|any} messages
-   * @returns {Promise}
+   * @returns {Promise<void>}
    */
   async publish (topics, messages) {
     assert(this.started, 'FloodSub is not started')
@@ -267,10 +271,10 @@ class FloodSub extends BaseProtocol {
     assert(this.started, 'FloodSub is not started')
 
     topics = ensureArray(topics)
-
     topics.forEach((topic) => this.subscriptions.add(topic))
 
     this.peers.forEach((peer) => sendSubscriptionsOnceReady(peer))
+
     // make sure that FloodSub is already mounted
     function sendSubscriptionsOnceReady (peer) {
       if (peer && peer.isWritable) {
@@ -303,6 +307,8 @@ class FloodSub extends BaseProtocol {
     function checkIfReady (peer) {
       if (peer && peer.isWritable) {
         peer.sendUnsubscriptions(topics)
+      } else {
+        nextTick(checkIfReady.bind(peer))
       }
     }
   }
