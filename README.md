@@ -37,19 +37,7 @@ js-libp2p-floodsub
 ```JavaScript
 const FloodSub = require('libp2p-floodsub')
 
-const registrar = {
-  handle: (multicodecs, handle) => {
-    // register multicodec to libp2p
-    // handle function is called everytime a remote peer opens a stream to the peer.
-  },
-  register: (multicodecs, handlers) => {
-    // handlers will be used to notify pubsub of peer connection establishment or closing
-  },
-  unregister: (id) => {
-
-  }
-}
-
+// registrar is provided by libp2p
 const fsub = new FloodSub(peerInfo, registrar, options)
 
 await fsub.start()
