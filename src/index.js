@@ -99,7 +99,7 @@ class FloodSub extends BaseProtocol {
    * @override
    * @param {string} idB58Str peer id string in base58
    * @param {Connection} conn connection
-   * @param {PeerInfo} peer peer info
+   * @param {Peer} peer PubSub peer
    * @returns {void}
    *
    */
@@ -118,7 +118,7 @@ class FloodSub extends BaseProtocol {
         }
       )
     } catch (err) {
-      this._onPeerDisconnected(peer, err)
+      this._onPeerDisconnected(peer.info, err)
     }
   }
 
