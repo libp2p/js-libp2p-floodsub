@@ -1,6 +1,5 @@
 'use strict'
 
-const assert = require('assert')
 const debug = require('debug')
 const debugName = 'libp2p:floodsub'
 const log = debug(debugName)
@@ -36,12 +35,23 @@ class FloodSub extends BaseProtocol {
    * @constructor
    */
   constructor (peerInfo, registrar, options = {}) {
-    assert(PeerInfo.isPeerInfo(peerInfo), 'peer info must be an instance of `peer-info`')
+    if (!PeerInfo.isPeerInfo(peerInfo)) {
+      throw new Error('peer info must be an instance of `peer-info`')
+    }
 
     // registrar handling
-    assert(registrar && typeof registrar.handle === 'function', 'a handle function must be provided in registrar')
-    assert(registrar && typeof registrar.register === 'function', 'a register function must be provided in registrar')
-    assert(registrar && typeof registrar.unregister === 'function', 'a unregister function must be provided in registrar')
+    if (typeof registrar !== 'object') {
+      throw new Error('a registrar object is required')
+    }
+    if (typeof registrar.handle !== 'function') {
+      throw new Error('a handle function must be provided in registrar')
+    }
+    if (typeof registrar.register !== 'function') {
+      throw new Error('a register function must be provided in registrar')
+    }
+    if (typeof registrar.unregister !== 'function') {
+      throw new Error('a unregister function must be provided in registrar')
+    }
 
     super({
       debugName: debugName,
@@ -229,7 +239,9 @@ class FloodSub extends BaseProtocol {
    * @returns {Promise<void>}
    */
   async publish (topics, messages) {
-    assert(this.started, 'FloodSub is not started')
+    if (!this.started) {
+      throw new Error('FloodSub is not started')
+    }
 
     log('publish', topics, messages)
 
@@ -268,7 +280,9 @@ class FloodSub extends BaseProtocol {
    * @returns {void}
    */
   subscribe (topics) {
-    assert(this.started, 'FloodSub is not started')
+    if (!this.started) {
+      throw new Error('FloodSub is not started')
+    }
 
     topics = ensureArray(topics)
     topics.forEach((topic) => this.subscriptions.add(topic))
@@ -296,7 +310,9 @@ class FloodSub extends BaseProtocol {
    * @returns {void}
    */
   unsubscribe (topics) {
-    assert(this.started, 'FloodSub is not started')
+    if (!this.started) {
+      throw new Error('FloodSub is not started')
+    }
 
     topics = ensureArray(topics)
 
@@ -319,7 +335,9 @@ class FloodSub extends BaseProtocol {
    * @returns {Array<String>}
    */
   getTopics () {
-    assert(this.started, 'FloodSub is not started')
+    if (!this.started) {
+      throw new Error('FloodSub is not started')
+    }
 
     return Array.from(this.subscriptions)
   }
