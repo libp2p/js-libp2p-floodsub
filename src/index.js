@@ -18,6 +18,24 @@ const { multicodec } = require('./config')
 
 const ensureArray = utils.ensureArray
 
+function validateRegistrar (registrar) {
+  if (typeof registrar !== 'object') {
+    throw new Error('a registrar object is required')
+  }
+
+  if (typeof registrar.handle !== 'function') {
+    throw new Error('a handle function must be provided in registrar')
+  }
+
+  if (typeof registrar.register !== 'function') {
+    throw new Error('a register function must be provided in registrar')
+  }
+
+  if (typeof registrar.unregister !== 'function') {
+    throw new Error('a unregister function must be provided in registrar')
+  }
+}
+
 /**
  * FloodSub (aka dumbsub is an implementation of pubsub focused on
  * delivering an API for Publish/Subscribe, but with no CastTree Forming
@@ -39,19 +57,7 @@ class FloodSub extends BaseProtocol {
       throw new Error('peer info must be an instance of `peer-info`')
     }
 
-    // registrar handling
-    if (typeof registrar !== 'object') {
-      throw new Error('a registrar object is required')
-    }
-    if (typeof registrar.handle !== 'function') {
-      throw new Error('a handle function must be provided in registrar')
-    }
-    if (typeof registrar.register !== 'function') {
-      throw new Error('a register function must be provided in registrar')
-    }
-    if (typeof registrar.unregister !== 'function') {
-      throw new Error('a unregister function must be provided in registrar')
-    }
+    validateRegistrar(registrar)
 
     super({
       debugName: debugName,
