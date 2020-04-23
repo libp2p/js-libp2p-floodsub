@@ -12,6 +12,8 @@ const TimeCache = require('time-cache')
 const nextTick = require('async.nexttick')
 
 const PeerInfo = require('peer-info')
+const { Buffer } = require('buffer')
+
 const BaseProtocol = require('libp2p-pubsub')
 const { message, utils } = require('libp2p-pubsub')
 const { multicodec } = require('./config')
