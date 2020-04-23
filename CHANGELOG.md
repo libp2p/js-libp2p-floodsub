@@ -1,3 +1,13 @@
+<a name="0.20.3"></a>
+## [0.20.3](https://github.com/libp2p/js-libp2p-floodsub/compare/v0.20.2...v0.20.3) (2020-04-23)
+
+
+### Bug Fixes
+
+* add buffer ([#103](https://github.com/libp2p/js-libp2p-floodsub/issues/103)) ([80b2d77](https://github.com/libp2p/js-libp2p-floodsub/commit/80b2d77))
+
+
+
 <a name="0.20.2"></a>
 ## [0.20.2](https://github.com/libp2p/js-libp2p-floodsub/compare/v0.20.1...v0.20.2) (2020-02-14)
 
