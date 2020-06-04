@@ -58,17 +58,28 @@ describe('basics between 2 nodes', () => {
     // Connect floodsub nodes
     before(async () => {
       const onConnectA = registrarRecordA[multicodec].onConnect
+      const onConnectB = registrarRecordB[multicodec].onConnect
+      const handleA = registrarRecordA[multicodec].handler
       const handleB = registrarRecordB[multicodec].handler
 
       // Notice peers of connection
       const [c0, c1] = ConnectionPair()
       await onConnectA(peerInfoB, c0)
+      await onConnectB(peerInfoA, c1)
 
       await handleB({
         protocol: multicodec,
         stream: c1.stream,
         connection: {
           remotePeer: peerInfoA.id
+        }
+      })
+
+      await handleA({
+        protocol: multicodec,
+        stream: c0.stream,
+        connection: {
+          remotePeer: peerInfoB.id
         }
       })
 
@@ -275,11 +286,27 @@ describe('basics between 2 nodes', () => {
       const dial = async () => {
         const onConnectA = registrarRecordA[multicodec].onConnect
         const onConnectB = registrarRecordB[multicodec].onConnect
+        const handleA = registrarRecordA[multicodec].handler
+        const handleB = registrarRecordB[multicodec].handler
 
         // Notice peers of connection
         const [c0, c1] = ConnectionPair()
         await onConnectA(peerInfoB, c0)
+        await handleB({
+          protocol: multicodec,
+          stream: c1.stream,
+          connection: {
+            remotePeer: peerInfoA.id
+          }
+        })
         await onConnectB(peerInfoA, c1)
+        await handleA({
+          protocol: multicodec,
+          stream: c0.stream,
+          connection: {
+            remotePeer: peerInfoB.id
+          }
+        })
       }
 
       await Promise.all([
