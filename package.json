@@ -62,7 +62,7 @@
     "debug": "^4.1.1",
     "it-length-prefixed": "^3.0.0",
     "it-pipe": "^1.0.1",
-    "libp2p-pubsub": "libp2p/js-libp2p-pubsub#fix/use-unidirectional-streams-v0.4.x",
+    "libp2p-pubsub": "~0.4.5",
     "p-map": "^3.0.0",
     "protons": "^1.0.1",
     "time-cache": "^0.3.0"
