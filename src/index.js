@@ -6,10 +6,8 @@ const log = debug(debugName)
 log.error = debug(`${debugName}:error`)
 
 const pipe = require('it-pipe')
-const lp = require('it-length-prefixed')
 const pMap = require('p-map')
 const TimeCache = require('time-cache')
-const nextTick = require('async.nexttick')
 const { Buffer } = require('buffer')
 const PeerId = require('peer-id')
 const BaseProtocol = require('libp2p-pubsub')
@@ -101,12 +99,8 @@ class FloodSub extends BaseProtocol {
   async _onPeerConnected (peerId, conn) {
     await super._onPeerConnected(peerId, conn)
     const idB58Str = peerId.toB58String()
-    const peer = this.peers.get(idB58Str)
-
-    if (peer && peer.isWritable) {
-      // Immediately send my own subscriptions to the newly established conn
-      peer.sendSubscriptions(this.subscriptions)
-    }
+    // Immediately send my own subscriptions to the newly established conn
+    this._sendSubscriptions(idB58Str, Array.from(this.subscriptions), true)
   }
 
   /**
@@ -124,7 +118,6 @@ class FloodSub extends BaseProtocol {
     try {
       await pipe(
         conn,
-        lp.decode(),
         async function (source) {
           for await (const data of source) {
             const rpc = Buffer.isBuffer(data) ? data : data.slice()
@@ -153,15 +146,37 @@ class FloodSub extends BaseProtocol {
     const subs = rpc.subscriptions
     const msgs = rpc.msgs
 
+    if (subs && subs.length) {
+      subs.forEach(sub => this._processRpcSubOpt(idB58Str, sub))
+      this.emit('floodsub:subscription-change', PeerId.createFromB58String(idB58Str), subs)
+    }
+
     if (msgs && msgs.length) {
       msgs.forEach((msg) => this._processRpcMessage(msg))
     }
+  }
 
-    const peer = this.peers.get(idB58Str)
+  /**
+   * Handles an subscription change from a peer
+   *
+   * @param {string} id
+   * @param {RPC.SubOpt} subOpt
+   */
+  _processRpcSubOpt (id, subOpt) {
+    const t = subOpt.topicID
 
-    if (peer && subs && subs.length) {
-      peer.updateSubscriptions(subs)
-      this.emit('floodsub:subscription-change', peer.id, peer.topics, subs)
+    let topicSet = this.topics.get(t)
+    if (!topicSet) {
+      topicSet = new Set()
+      this.topics.set(t, topicSet)
+    }
+
+    if (subOpt.subscribe) {
+      // subscribe peer to new topic
+      topicSet.add(id)
+    } else {
+      // unsubscribe from existing topic
+      topicSet.delete(id)
     }
   }
 
@@ -181,17 +196,10 @@ class FloodSub extends BaseProtocol {
     this.seenCache.put(seqno)
 
     // 2. validate the message (signature verification)
-    let isValid
-    let error
-
     try {
-      isValid = await this.validate(message)
+      await this.validate(message)
     } catch (err) {
-      error = err
-    }
-
-    if (error || !isValid) {
-      log('Message could not be validated, dropping it. isValid=%s', isValid, error)
+      log('Message is not valid, dropping it.', err)
       return
     }
 
@@ -215,14 +223,15 @@ class FloodSub extends BaseProtocol {
   }
 
   _forwardMessages (topics, messages) {
-    this.peers.forEach((peer) => {
-      if (!peer.isWritable || !utils.anyMatch(peer.topics, topics)) {
+    topics.forEach((topic) => {
+      const peers = this.topics.get(topic)
+      if (!peers) {
         return
       }
-
-      peer.sendMessages(utils.normalizeOutRpcMessages(messages))
-
-      log('publish msgs on topics', topics, peer.id.toB58String())
+      peers.forEach((id) => {
+        log('publish msgs on topics', topics, id)
+        this._sendRpc(id, { msgs: messages.map(utils.normalizeOutRpcMessage) })
+      })
     })
   }
 
@@ -293,20 +302,7 @@ class FloodSub extends BaseProtocol {
     topics = ensureArray(topics)
     topics.forEach((topic) => this.subscriptions.add(topic))
 
-    this.peers.forEach((peer) => sendSubscriptionsOnceReady(peer))
-
-    // make sure that FloodSub is already mounted
-    function sendSubscriptionsOnceReady (peer) {
-      if (peer && peer.isWritable) {
-        return peer.sendSubscriptions(topics)
-      }
-      const onConnection = () => {
-        peer.removeListener('connection', onConnection)
-        sendSubscriptionsOnceReady(peer)
-      }
-      peer.on('connection', onConnection)
-      peer.once('close', () => peer.removeListener('connection', onConnection))
-    }
+    this.peers.forEach((_, id) => this._sendSubscriptions(id, topics, true))
   }
 
   /**
@@ -324,15 +320,7 @@ class FloodSub extends BaseProtocol {
 
     topics.forEach((topic) => this.subscriptions.delete(topic))
 
-    this.peers.forEach((peer) => checkIfReady(peer))
-    // make sure that FloodSub is already mounted
-    function checkIfReady (peer) {
-      if (peer && peer.isWritable) {
-        peer.sendUnsubscriptions(topics)
-      } else {
-        nextTick(checkIfReady.bind(peer))
-      }
-    }
+    this.peers.forEach((_, id) => this._sendSubscriptions(id, topics, false))
   }
 
   /**
@@ -346,6 +334,42 @@ class FloodSub extends BaseProtocol {
     }
 
     return Array.from(this.subscriptions)
+  }
+
+  /**
+   * Encode an rpc object to a buffer
+   * @param {RPC} rpc
+   * @returns {Buffer}
+   */
+  _encodeRpc (rpc) {
+    return message.rpc.RPC.encode(rpc)
+  }
+
+  /**
+   * Send an rpc object to a peer
+   * @param {string} id peer id
+   * @param {RPC} rpc
+   * @returns {void}
+   */
+  _sendRpc (id, rpc) {
+    const peerStreams = this.peers.get(id)
+    if (!peerStreams || !peerStreams.isWritable) {
+      return
+    }
+    peerStreams.write(this._encodeRpc(rpc))
+  }
+
+  /**
+   * Send subscroptions to a peer
+   * @param {string} id peer id
+   * @param {string[]} topics
+   * @param {boolean} subscribe set to false for unsubscriptions
+   * @returns {void}
+   */
+  _sendSubscriptions (id, topics, subscribe) {
+    return this._sendRpc(id, {
+      subscriptions: topics.map(t => ({ topicID: t, subscribe: subscribe }))
+    })
   }
 }
 
