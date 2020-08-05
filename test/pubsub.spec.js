@@ -6,7 +6,8 @@ const { expect } = require('aegir/utils/chai')
 const sinon = require('sinon')
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const Floodsub = require('../src')
-const { createPeerId, mockRegistrar } = require('./utils')
+
+const { createPeers } = require('./utils/create-peer')
 const { utils } = require('libp2p-pubsub')
 
 const defOptions = {
@@ -15,13 +16,13 @@ const defOptions = {
 
 describe('pubsub', () => {
   let floodsub
-  let peerId
+  let peer
 
   before(async () => {
     expect(Floodsub.multicodec).to.exist()
 
-    peerId = await createPeerId()
-    floodsub = new Floodsub(peerId, mockRegistrar, defOptions)
+    ;[peer] = await createPeers()
+    floodsub = new Floodsub(peer, defOptions)
   })
 
   beforeEach(() => {
@@ -47,7 +48,7 @@ describe('pubsub', () => {
       const [topics, messages] = floodsub._emitMessages.getCall(0).args
       expect(topics).to.eql([topic])
       expect(messages).to.eql([{
-        from: peerId.toB58String(),
+        from: peer.peerId.toB58String(),
         data: message,
         seqno: utils.randomSeqno.getCall(0).returnValue,
         topicIDs: topics
@@ -66,7 +67,7 @@ describe('pubsub', () => {
       const [topics, messages] = floodsub._forwardMessages.getCall(0).args
 
       const expected = await floodsub._buildMessage({
-        from: peerId.toB58String(),
+        from: peer.peerId.toB58String(),
         data: message,
         seqno: utils.randomSeqno.getCall(0).returnValue,
         topicIDs: topics
@@ -89,7 +90,7 @@ describe('pubsub', () => {
       const rpc = {
         subscriptions: [],
         msgs: [{
-          from: peerId.id,
+          from: peer.peerId.id,
           data: uint8ArrayFromString('an unsigned message'),
           seqno: utils.randomSeqno(),
           topicIDs: [topic]
@@ -119,7 +120,7 @@ describe('pubsub', () => {
       const rpc = {
         subscriptions: [],
         msgs: [{
-          from: peerId.id,
+          from: peer.peerId.id,
           data: uint8ArrayFromString('an unsigned message'),
           seqno: utils.randomSeqno(),
           topicIDs: [topic]

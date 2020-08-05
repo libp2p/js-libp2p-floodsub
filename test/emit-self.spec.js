@@ -8,21 +8,19 @@ const expect = chai.expect
 const uint8ArrayFromString = require('uint8arrays/from-string')
 const FloodSub = require('../src')
 
-const {
-  createPeerId, mockRegistrar
-} = require('./utils')
+const { createPeers } = require('./utils/create-peer')
 
 const shouldNotHappen = (_) => expect.fail()
 
 describe('emit self', () => {
   let floodsub
-  let peerId
+  let peer
   const topic = 'Z'
 
   describe('enabled', () => {
     before(async () => {
-      peerId = await createPeerId()
-      floodsub = new FloodSub(peerId, mockRegistrar, { emitSelf: true })
+      [peer] = await createPeers()
+      floodsub = new FloodSub(peer, { emitSelf: true })
     })
 
     before(async () => {
@@ -44,8 +42,8 @@ describe('emit self', () => {
 
   describe('disabled', () => {
     before(async () => {
-      peerId = await createPeerId()
-      floodsub = new FloodSub(peerId, mockRegistrar, { emitSelf: false })
+      [peer] = await createPeers()
+      floodsub = new FloodSub(peer, { emitSelf: false })
     })
 
     before(async () => {

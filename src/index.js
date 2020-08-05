@@ -14,24 +14,6 @@ const { multicodec } = require('./config')
 
 const ensureArray = utils.ensureArray
 
-function validateRegistrar (registrar) {
-  if (typeof registrar !== 'object') {
-    throw new Error('a registrar object is required')
-  }
-
-  if (typeof registrar.handle !== 'function') {
-    throw new Error('a handle function must be provided in registrar')
-  }
-
-  if (typeof registrar.register !== 'function') {
-    throw new Error('a register function must be provided in registrar')
-  }
-
-  if (typeof registrar.unregister !== 'function') {
-    throw new Error('a unregister function must be provided in registrar')
-  }
-}
-
 /**
  * FloodSub (aka dumbsub is an implementation of pubsub focused on
  * delivering an API for Publish/Subscribe, but with no CastTree Forming
@@ -39,27 +21,17 @@ function validateRegistrar (registrar) {
  */
 class FloodSub extends BaseProtocol {
   /**
-   * @param {PeerId} peerId instance of the peer's PeerId
-   * @param {Object} registrar
-   * @param {function} registrar.handle
-   * @param {function} registrar.register
-   * @param {function} registrar.unregister
+   * @param {Libp2p} libp2p instance of libp2p
    * @param {Object} [options]
    * @param {boolean} options.emitSelf if publish should emit to self, if subscribed, defaults to false
    * @constructor
    */
-  constructor (peerId, registrar, options = {}) {
-    if (!PeerId.isPeerId(peerId)) {
-      throw new Error('peerId must be an instance of `peer-id`')
-    }
-
-    validateRegistrar(registrar)
-
+  constructor (libp2p, options = {}) {
     super({
       debugName: debugName,
       multicodecs: multicodec,
-      peerId: peerId,
-      registrar: registrar,
+      peerId: libp2p.peerId,
+      registrar: libp2p.registrar,
       ...options
     })
 

@@ -8,16 +8,11 @@ const uint8ArrayToString = require('uint8arrays/to-string')
 const pDefer = require('p-defer')
 
 const FloodSub = require('../src')
-const { multicodec } = require('../src')
-const {
-  createPeerId,
-  createMockRegistrar,
-  expectSet,
-  ConnectionPair
-} = require('./utils')
+const { expectSet } = require('./utils')
+const { createPeers } = require('./utils/create-peer')
 
-async function spawnPubSubNode (peerId, reg) {
-  const ps = new FloodSub(peerId, reg, { emitSelf: true })
+async function spawnPubSubNode (peer) {
+  const ps = new FloodSub(peer, { emitSelf: true })
 
   await ps.start()
   return ps
@@ -30,71 +25,22 @@ describe('multiple nodes (more than 2)', () => {
       // ◉────◉────◉
       // a    b    c
       let psA, psB, psC
-      let peerIdA, peerIdB, peerIdC
-
-      const registrarRecordA = {}
-      const registrarRecordB = {}
-      const registrarRecordC = {}
+      let peerA, peerB, peerC
 
       beforeEach(async () => {
-        [peerIdA, peerIdB, peerIdC] = await Promise.all([
-          createPeerId(),
-          createPeerId(),
-          createPeerId()
-        ]);
+        [peerA, peerB, peerC] = await createPeers({ number: 3 })
 
-        [psA, psB, psC] = await Promise.all([
-          spawnPubSubNode(peerIdA, createMockRegistrar(registrarRecordA)),
-          spawnPubSubNode(peerIdB, createMockRegistrar(registrarRecordB)),
-          spawnPubSubNode(peerIdC, createMockRegistrar(registrarRecordC))
+        ;[psA, psB, psC] = await Promise.all([
+          spawnPubSubNode(peerA),
+          spawnPubSubNode(peerB),
+          spawnPubSubNode(peerC)
         ])
       })
 
       // connect nodes
       beforeEach(async () => {
-        const onConnectA = registrarRecordA[multicodec].onConnect
-        const onConnectB = registrarRecordB[multicodec].onConnect
-        const onConnectC = registrarRecordC[multicodec].onConnect
-        const handleA = registrarRecordA[multicodec].handler
-        const handleB = registrarRecordB[multicodec].handler
-        const handleC = registrarRecordC[multicodec].handler
-
-        // Notice peers of connection
-        const [d0, d1] = ConnectionPair()
-        await onConnectA(peerIdB, d0)
-        await handleB({
-          protocol: multicodec,
-          stream: d1.stream,
-          connection: {
-            remotePeer: peerIdA
-          }
-        })
-        await onConnectB(peerIdA, d1)
-        await handleA({
-          protocol: multicodec,
-          stream: d0.stream,
-          connection: {
-            remotePeer: peerIdB
-          }
-        })
-
-        const [d2, d3] = ConnectionPair()
-        await onConnectB(peerIdC, d2)
-        await handleC({
-          protocol: multicodec,
-          stream: d3.stream,
-          connection: {
-            remotePeer: peerIdB
-          }
-        })
-        await onConnectC(peerIdB, d3)
-        await handleB({
-          protocol: multicodec,
-          stream: d2.stream,
-          connection: {
-            remotePeer: peerIdC
-          }
-        })
+        await peerA.dialProtocol(peerB.peerId, FloodSub.multicodec)
+        await peerB.dialProtocol(peerC.peerId, FloodSub.multicodec)
       })
 
       after(() => Promise.all([
@@ -259,117 +205,25 @@ describe('multiple nodes (more than 2)', () => {
       // ◉─┘       └─◉
       // a
       let psA, psB, psC, psD, psE
-      let peerIdA, peerIdB, peerIdC, peerIdD, peerIdE
-
-      const registrarRecordA = {}
-      const registrarRecordB = {}
-      const registrarRecordC = {}
-      const registrarRecordD = {}
-      const registrarRecordE = {}
+      let peerA, peerB, peerC, peerD, peerE
 
       before(async () => {
-        [peerIdA, peerIdB, peerIdC, peerIdD, peerIdE] = await Promise.all([
-          createPeerId(),
-          createPeerId(),
-          createPeerId(),
-          createPeerId(),
-          createPeerId()
-        ]);
-
-        [psA, psB, psC, psD, psE] = await Promise.all([
-          spawnPubSubNode(peerIdA, createMockRegistrar(registrarRecordA)),
-          spawnPubSubNode(peerIdB, createMockRegistrar(registrarRecordB)),
-          spawnPubSubNode(peerIdC, createMockRegistrar(registrarRecordC)),
-          spawnPubSubNode(peerIdD, createMockRegistrar(registrarRecordD)),
-          spawnPubSubNode(peerIdE, createMockRegistrar(registrarRecordE))
+        [peerA, peerB, peerC, peerD, peerE] = await createPeers({ number: 5 })
+        ;[psA, psB, psC, psD, psE] = await Promise.all([
+          spawnPubSubNode(peerA),
+          spawnPubSubNode(peerB),
+          spawnPubSubNode(peerC),
+          spawnPubSubNode(peerD),
+          spawnPubSubNode(peerE)
         ])
       })
 
       // connect nodes
       before(async () => {
-        const onConnectA = registrarRecordA[multicodec].onConnect
-        const onConnectB = registrarRecordB[multicodec].onConnect
-        const onConnectC = registrarRecordC[multicodec].onConnect
-        const onConnectD = registrarRecordD[multicodec].onConnect
-        const onConnectE = registrarRecordE[multicodec].onConnect
-        const handleA = registrarRecordA[multicodec].handler
-        const handleB = registrarRecordB[multicodec].handler
-        const handleC = registrarRecordC[multicodec].handler
-        const handleD = registrarRecordD[multicodec].handler
-        const handleE = registrarRecordE[multicodec].handler
-
-        // Notice peers of connection
-        const [d0, d1] = ConnectionPair() // A <-> B
-        await onConnectA(peerIdB, d0)
-        await handleB({
-          protocol: multicodec,
-          stream: d1.stream,
-          connection: {
-            remotePeer: peerIdA
-          }
-        })
-        await onConnectB(peerIdA, d1)
-        await handleA({
-          protocol: multicodec,
-          stream: d0.stream,
-          connection: {
-            remotePeer: peerIdB
-          }
-        })
-
-        const [d2, d3] = ConnectionPair() // B <-> C
-        await onConnectB(peerIdC, d2)
-        await handleC({
-          protocol: multicodec,
-          stream: d3.stream,
-          connection: {
-            remotePeer: peerIdB
-          }
-        })
-        await onConnectC(peerIdB, d3)
-        await handleB({
-          protocol: multicodec,
-          stream: d2.stream,
-          connection: {
-            remotePeer: peerIdC
-          }
-        })
-
-        const [d4, d5] = ConnectionPair() // C <-> D
-        await onConnectC(peerIdD, d4)
-        await handleD({
-          protocol: multicodec,
-          stream: d5.stream,
-          connection: {
-            remotePeer: peerIdC
-          }
-        })
-        await onConnectD(peerIdC, d5)
-        await handleC({
-          protocol: multicodec,
-          stream: d4.stream,
-          connection: {
-            remotePeer: peerIdD
-          }
-        })
-
-        const [d6, d7] = ConnectionPair() // D <-> E
-        await onConnectD(peerIdE, d6)
-        await handleE({
-          protocol: multicodec,
-          stream: d7.stream,
-          connection: {
-            remotePeer: peerIdD
-          }
-        })
-        await onConnectE(peerIdD, d7)
-        await handleD({
-          protocol: multicodec,
-          stream: d6.stream,
-          connection: {
-            remotePeer: peerIdE
-          }
-        })
+        await peerA.dialProtocol(peerB.peerId, FloodSub.multicodec)
+        await peerB.dialProtocol(peerC.peerId, FloodSub.multicodec)
+        await peerC.dialProtocol(peerD.peerId, FloodSub.multicodec)
+        await peerD.dialProtocol(peerE.peerId, FloodSub.multicodec)
       })
 
       after(() => Promise.all([
