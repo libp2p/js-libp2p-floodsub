@@ -96,7 +96,7 @@ describe('pubsub', () => {
         }]
       }
 
-      floodsub._onRpc('QmAnotherPeer', rpc)
+      floodsub._processRpc('QmAnotherPeer', rpc)
 
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -126,7 +126,7 @@ describe('pubsub', () => {
         }]
       }
 
-      floodsub._onRpc('QmAnotherPeer', rpc)
+      floodsub._processRpc('QmAnotherPeer', rpc)
 
       return new Promise((resolve) => {
         setTimeout(() => {

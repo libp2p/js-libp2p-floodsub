@@ -96,16 +96,16 @@ describe('basics between 2 nodes', () => {
     })
 
     it('Subscribe to a topic:Z in nodeA', () => {
+      const topic = 'Z'
       const defer = pDefer()
 
-      fsA.subscribe('Z')
-      fsB.once('floodsub:subscription-change', (changedPeerId, changedTopics, changedSubs) => {
-        expectSet(fsA.subscriptions, ['Z'])
+      fsA.subscribe(topic)
+      fsB.once('floodsub:subscription-change', (changedPeerId, changedSubs) => {
+        expectSet(fsA.subscriptions, [topic])
         expect(fsB.peers.size).to.equal(1)
-        expectSet(first(fsB.peers).topics, ['Z'])
+        expectSet(fsB.topics.get(topic), [fsA.peerId.toB58String()])
         expect(changedPeerId.toB58String()).to.equal(first(fsB.peers).id.toB58String())
-        expectSet(changedTopics, ['Z'])
-        expect(changedSubs).to.be.eql([{ topicID: 'Z', subscribe: true }])
+        expect(changedSubs).to.be.eql([{ topicID: topic, subscribe: true }])
         defer.resolve()
       })
 
@@ -175,46 +175,18 @@ describe('basics between 2 nodes', () => {
       return defer.promise
     })
 
-    it('Publish 10 msg to a topic:Z in nodeB as array', () => {
-      const defer = pDefer()
-      let counter = 0
-
-      fsB.once('Z', shouldNotHappen)
-      fsA.on('Z', receivedMsg)
-
-      function receivedMsg (msg) {
-        expect(uint8ArrayToString(msg.data)).to.equal('banana')
-        expect(msg.from).to.be.eql(fsB.peerId.toB58String())
-        expect(msg.seqno).to.be.a('Uint8Array')
-        expect(msg.topicIDs).to.be.eql(['Z'])
-
-        if (++counter === 10) {
-          fsA.removeListener('Z', receivedMsg)
-          fsB.removeListener('Z', shouldNotHappen)
-
-          defer.resolve()
-        }
-      }
-
-      const msgs = []
-      times(10, () => msgs.push(uint8ArrayFromString('banana')))
-      fsB.publish('Z', msgs)
-
-      return defer.promise
-    })
-
     it('Unsubscribe from topic:Z in nodeA', () => {
       const defer = pDefer()
+      const topic = 'Z'
 
-      fsA.unsubscribe('Z')
+      fsA.unsubscribe(topic)
       expect(fsA.subscriptions.size).to.equal(0)
 
-      fsB.once('floodsub:subscription-change', (changedPeerId, changedTopics, changedSubs) => {
+      fsB.once('floodsub:subscription-change', (changedPeerId, changedSubs) => {
         expect(fsB.peers.size).to.equal(1)
-        expectSet(first(fsB.peers).topics, [])
+        expectSet(fsB.topics.get(topic), [])
         expect(changedPeerId.toB58String()).to.equal(first(fsB.peers).id.toB58String())
-        expectSet(changedTopics, [])
-        expect(changedSubs).to.be.eql([{ topicID: 'Z', subscribe: false }])
+        expect(changedSubs).to.be.eql([{ topicID: topic, subscribe: false }])
 
         defer.resolve()
       })
@@ -321,10 +293,10 @@ describe('basics between 2 nodes', () => {
       expect(fsB.peers.size).to.equal(1)
 
       expectSet(fsA.subscriptions, ['Za'])
-      expectSet(first(fsB.peers).topics, ['Za'])
+      expectSet(fsB.topics.get('Za'), [fsA.peerId.toB58String()])
 
       expectSet(fsB.subscriptions, ['Zb'])
-      expectSet(first(fsA.peers).topics, ['Zb'])
+      expectSet(fsA.topics.get('Zb'), [fsB.peerId.toB58String()])
     })
   })
 })

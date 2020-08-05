@@ -12,7 +12,6 @@ const { multicodec } = require('../src')
 const {
   createPeerId,
   createMockRegistrar,
-  first,
   expectSet,
   ConnectionPair
 } = require('./utils')
@@ -37,7 +36,7 @@ describe('multiple nodes (more than 2)', () => {
       const registrarRecordB = {}
       const registrarRecordC = {}
 
-      before(async () => {
+      beforeEach(async () => {
         [peerIdA, peerIdB, peerIdC] = await Promise.all([
           createPeerId(),
           createPeerId(),
@@ -52,7 +51,7 @@ describe('multiple nodes (more than 2)', () => {
       })
 
       // connect nodes
-      before(async () => {
+      beforeEach(async () => {
         const onConnectA = registrarRecordA[multicodec].onConnect
         const onConnectB = registrarRecordB[multicodec].onConnect
         const onConnectC = registrarRecordC[multicodec].onConnect
@@ -105,19 +104,20 @@ describe('multiple nodes (more than 2)', () => {
       ]))
 
       it('subscribe to the topic on node a', () => {
+        const topic = 'Z'
         const defer = pDefer()
 
-        psA.subscribe('Z')
-        expectSet(psA.subscriptions, ['Z'])
+        psA.subscribe(topic)
+        expectSet(psA.subscriptions, [topic])
 
         psB.once('floodsub:subscription-change', () => {
           expect(psB.peers.size).to.equal(2)
+
           const aPeerId = psA.peerId.toB58String()
-          const topics = psB.peers.get(aPeerId).topics
-          expectSet(topics, ['Z'])
+          expectSet(psB.topics.get(topic), [aPeerId])
 
           expect(psC.peers.size).to.equal(1)
-          expectSet(first(psC.peers).topics, [])
+          expect(psC.topics.get(topic)).to.not.exist()
 
           defer.resolve()
         })
@@ -126,8 +126,9 @@ describe('multiple nodes (more than 2)', () => {
       })
 
       it('subscribe to the topic on node b', async () => {
-        psB.subscribe('Z')
-        expectSet(psB.subscriptions, ['Z'])
+        const topic = 'Z'
+        psB.subscribe(topic)
+        expectSet(psB.subscriptions, [topic])
 
         await Promise.all([
           new Promise((resolve) => psA.once('floodsub:subscription-change', resolve)),
@@ -135,26 +136,23 @@ describe('multiple nodes (more than 2)', () => {
         ])
 
         expect(psA.peers.size).to.equal(1)
-        expectSet(first(psA.peers).topics, ['Z'])
+        expectSet(psA.topics.get(topic), [psB.peerId.toB58String()])
 
         expect(psC.peers.size).to.equal(1)
-        expectSet(first(psC.peers).topics, ['Z'])
+        expectSet(psC.topics.get(topic), [psB.peerId.toB58String()])
       })
 
       it('subscribe to the topic on node c', () => {
+        const topic = 'Z'
         const defer = pDefer()
 
-        psC.subscribe('Z')
-        expectSet(psC.subscriptions, ['Z'])
+        psC.subscribe(topic)
+        expectSet(psC.subscriptions, [topic])
 
         psB.once('floodsub:subscription-change', () => {
           expect(psA.peers.size).to.equal(1)
-          expectSet(first(psA.peers).topics, ['Z'])
-
           expect(psB.peers.size).to.equal(2)
-          psB.peers.forEach((peer) => {
-            expectSet(peer.topics, ['Z'])
-          })
+          expectSet(psB.topics.get(topic), [psC.peerId.toB58String()])
 
           defer.resolve()
         })
@@ -162,16 +160,28 @@ describe('multiple nodes (more than 2)', () => {
         return defer.promise
       })
 
-      it('publish on node a', () => {
+      it('publish on node a', async () => {
+        const topic = 'Z'
         const defer = pDefer()
+
+        psA.subscribe(topic)
+        psB.subscribe(topic)
+        psC.subscribe(topic)
+
+        // await subscription change
+        await Promise.all([
+          new Promise(resolve => psA.once('floodsub:subscription-change', () => resolve())),
+          new Promise(resolve => psB.once('floodsub:subscription-change', () => resolve())),
+          new Promise(resolve => psC.once('floodsub:subscription-change', () => resolve()))
+        ])
 
         let counter = 0
 
-        psA.on('Z', incMsg)
-        psB.on('Z', incMsg)
-        psC.on('Z', incMsg)
+        psA.on(topic, incMsg)
+        psB.on(topic, incMsg)
+        psC.on(topic, incMsg)
 
-        psA.publish('Z', uint8ArrayFromString('hey'))
+        psA.publish(topic, uint8ArrayFromString('hey'))
 
         function incMsg (msg) {
           expect(uint8ArrayToString(msg.data)).to.equal('hey')
@@ -180,36 +190,9 @@ describe('multiple nodes (more than 2)', () => {
 
         function check () {
           if (++counter === 3) {
-            psA.removeListener('Z', incMsg)
-            psB.removeListener('Z', incMsg)
-            psC.removeListener('Z', incMsg)
-            defer.resolve()
-          }
-        }
-
-        return defer.promise
-      })
-
-      it('publish array on node a', () => {
-        const defer = pDefer()
-        let counter = 0
-
-        psA.on('Z', incMsg)
-        psB.on('Z', incMsg)
-        psC.on('Z', incMsg)
-
-        psA.publish('Z', [uint8ArrayFromString('hey'), uint8ArrayFromString('hey')])
-
-        function incMsg (msg) {
-          expect(uint8ArrayToString(msg.data)).to.equal('hey')
-          check()
-        }
-
-        function check () {
-          if (++counter === 6) {
-            psA.removeListener('Z', incMsg)
-            psB.removeListener('Z', incMsg)
-            psC.removeListener('Z', incMsg)
+            psA.removeListener(topic, incMsg)
+            psB.removeListener(topic, incMsg)
+            psC.removeListener(topic, incMsg)
             defer.resolve()
           }
         }
@@ -226,15 +209,27 @@ describe('multiple nodes (more than 2)', () => {
         //   ◉─┘ └─◉
         //   a     c
 
-        it('publish on node b', () => {
+        it('publish on node b', async () => {
+          const topic = 'Z'
           const defer = pDefer()
           let counter = 0
 
-          psA.on('Z', incMsg)
-          psB.on('Z', incMsg)
-          psC.on('Z', incMsg)
+          psA.subscribe(topic)
+          psB.subscribe(topic)
+          psC.subscribe(topic)
 
-          psB.publish('Z', uint8ArrayFromString('hey'))
+          // await subscription change
+          await Promise.all([
+            new Promise(resolve => psA.once('floodsub:subscription-change', () => resolve())),
+            new Promise(resolve => psB.once('floodsub:subscription-change', () => resolve())),
+            new Promise(resolve => psC.once('floodsub:subscription-change', () => resolve()))
+          ])
+
+          psA.on(topic, incMsg)
+          psB.on(topic, incMsg)
+          psC.on(topic, incMsg)
+
+          psB.publish(topic, uint8ArrayFromString('hey'))
 
           function incMsg (msg) {
             expect(uint8ArrayToString(msg.data)).to.equal('hey')
@@ -243,9 +238,9 @@ describe('multiple nodes (more than 2)', () => {
 
           function check () {
             if (++counter === 3) {
-              psA.removeListener('Z', incMsg)
-              psB.removeListener('Z', incMsg)
-              psC.removeListener('Z', incMsg)
+              psA.removeListener(topic, incMsg)
+              psB.removeListener(topic, incMsg)
+              psC.removeListener(topic, incMsg)
               defer.resolve()
             }
           }
