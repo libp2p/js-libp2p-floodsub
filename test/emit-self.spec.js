@@ -29,7 +29,10 @@ describe('emit self', () => {
       floodsub.subscribe(topic)
     })
 
-    after(() => floodsub.stop())
+    after(async () => {
+      await floodsub.stop()
+      await peer.stop()
+    })
 
     it('should emit to self on publish', () => {
       const promise = new Promise((resolve) => floodsub.once(topic, resolve))
@@ -52,7 +55,10 @@ describe('emit self', () => {
       floodsub.subscribe(topic)
     })
 
-    after(() => floodsub.stop())
+    after(async () => {
+      await floodsub.stop()
+      await peer.stop()
+    })
 
     it('should emit to self on publish', () => {
       floodsub.once(topic, (m) => shouldNotHappen)

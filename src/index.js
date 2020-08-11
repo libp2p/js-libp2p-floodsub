@@ -8,8 +8,9 @@ log.error = debug(`${debugName}:error`)
 const pipe = require('it-pipe')
 const TimeCache = require('time-cache')
 const PeerId = require('peer-id')
-const BaseProtocol = require('libp2p-pubsub')
-const { message, utils } = require('libp2p-pubsub')
+const BaseProtocol = require('libp2p-interfaces/src/pubsub')
+const { message, utils } = require('libp2p-interfaces/src/pubsub')
+
 const { multicodec } = require('./config')
 
 const ensureArray = utils.ensureArray
@@ -30,8 +31,7 @@ class FloodSub extends BaseProtocol {
     super({
       debugName: debugName,
       multicodecs: multicodec,
-      peerId: libp2p.peerId,
-      registrar: libp2p.registrar,
+      libp2p,
       ...options
     })
 
@@ -69,6 +69,7 @@ class FloodSub extends BaseProtocol {
   async _onPeerConnected (peerId, conn) {
     await super._onPeerConnected(peerId, conn)
     const idB58Str = peerId.toB58String()
+
     // Immediately send my own subscriptions to the newly established conn
     this._sendSubscriptions(idB58Str, Array.from(this.subscriptions), true)
   }
@@ -257,15 +258,21 @@ class FloodSub extends BaseProtocol {
    * Subscribe to the given topic(s).
    * @override
    * @param {Array<string>|string} topics
+   * @param {function} [handler]
    * @returns {void}
    */
-  subscribe (topics) {
+  subscribe (topics, handler) {
     if (!this.started) {
       throw new Error('FloodSub is not started')
     }
 
     topics = ensureArray(topics)
-    topics.forEach((topic) => this.subscriptions.add(topic))
+    topics.forEach((topic) => {
+      this.subscriptions.add(topic)
+
+      // Bind provider handler
+      handler && this.on(topic, handler)
+    })
 
     this.peers.forEach((_, id) => this._sendSubscriptions(id, topics, true))
   }
@@ -274,16 +281,26 @@ class FloodSub extends BaseProtocol {
    * Unsubscribe from the given topic(s).
    * @override
    * @param {Array<string>|string} topics
+   * @param {function} [handler]
    * @returns {void}
    */
-  unsubscribe (topics) {
+  unsubscribe (topics, handler) {
     if (!this.started) {
       throw new Error('FloodSub is not started')
     }
 
     topics = ensureArray(topics)
 
-    topics.forEach((topic) => this.subscriptions.delete(topic))
+    topics.forEach((topic) => {
+      this.subscriptions.delete(topic)
+
+      // Remove bind handlers
+      if (!handler) {
+        this.removeAllListeners(topic)
+      } else {
+        this.removeListener(topic, handler)
+      }
+    })
 
     this.peers.forEach((_, id) => this._sendSubscriptions(id, topics, false))
   }
