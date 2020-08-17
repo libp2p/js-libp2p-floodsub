@@ -119,7 +119,7 @@ class FloodSub extends BaseProtocol {
 
     if (subs && subs.length) {
       subs.forEach(sub => this._processRpcSubOpt(idB58Str, sub))
-      this.emit('floodsub:subscription-change', PeerId.createFromB58String(idB58Str), subs)
+      this.emit('pubsub:subscription-change', PeerId.createFromB58String(idB58Str), subs)
     }
 
     if (msgs && msgs.length) {
