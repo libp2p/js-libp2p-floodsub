@@ -56,7 +56,6 @@
   },
   "dependencies": {
     "debug": "^4.1.1",
-    "it-pipe": "^1.0.1",
     "libp2p-interfaces": "libp2p/js-libp2p-interfaces#feat/interface-pubsub",
     "peer-id": "^0.13.11",
     "protons": "^2.0.0",
