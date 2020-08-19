@@ -44,6 +44,7 @@
   "devDependencies": {
     "aegir": "^25.0.0",
     "benchmark": "^2.1.4",
+    "chai": "^4.2.0",
     "libp2p": "https://github.com/libp2p/js-libp2p#0.29.x",
     "libp2p-mplex": "^0.9.5",
     "libp2p-noise": "^1.1.2",

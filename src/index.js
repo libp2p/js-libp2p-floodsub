@@ -7,6 +7,7 @@ log.error = debug(`${debugName}:error`)
 
 const TimeCache = require('time-cache')
 const BaseProtocol = require('libp2p-interfaces/src/pubsub')
+const { utils } = require('libp2p-interfaces/src/pubsub')
 
 const { multicodec } = require('./config')
 
@@ -80,7 +81,9 @@ class FloodSub extends BaseProtocol {
       }
       peers.forEach((id) => {
         log('publish msgs on topics', message.topicIDs, id)
-        id !== this.peerId.toB58String() && this._sendRpc(id, { msgs: [message] })
+        if (id !== this.peerId.toB58String()) {
+          this._sendRpc(id, { msgs: [utils.normalizeOutRpcMessage(message)] })
+        }
       })
     })
   }

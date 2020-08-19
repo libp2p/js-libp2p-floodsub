@@ -18,7 +18,7 @@ const defOptions = {
 const topic = 'my-topic'
 const message = uint8ArrayFromString('a neat message')
 
-describe('pubsub', () => {
+describe('floodsub', () => {
   let floodsub1, floodsub2
   let peer1, peer2
 
@@ -92,13 +92,14 @@ describe('pubsub', () => {
     expect(floodsub1._forwardMessage.callCount).to.eql(1)
     const [messageToEmit] = floodsub1._forwardMessage.getCall(0).args
 
-    const expected = await floodsub1._buildMessage({
-      receivedFrom: peer1.peerId.toB58String(),
-      from: peer1.peerId.toBytes(),
-      data: message,
-      seqno: utils.randomSeqno.getCall(0).returnValue,
-      topicIDs: [topic]
-    })
+    const expected = utils.normalizeInRpcMessage(
+      await floodsub1._buildMessage({
+        receivedFrom: peer1.peerId.toB58String(),
+        from: peer1.peerId.toB58String(),
+        data: message,
+        seqno: utils.randomSeqno.getCall(0).returnValue,
+        topicIDs: [topic]
+      }))
 
     expect(messageToEmit).to.eql(expected)
   })
