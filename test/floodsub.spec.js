@@ -60,7 +60,8 @@ describe('floodsub', () => {
     await floodsub1._libp2p.dial(floodsub2._libp2p.peerId)
 
     // subscribe and wait for subscription to be received in the other peer
-    floodsub2.subscribe(topic, checkMessage)
+    floodsub2.subscribe(topic)
+    floodsub2.on(topic, checkMessage)
     await pWaitFor(() => {
       const subs = floodsub1.getSubscribers(topic)
 
