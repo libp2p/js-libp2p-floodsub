@@ -16,6 +16,8 @@ const WS = require('libp2p-websockets')
 const MPLEX = require('libp2p-mplex')
 const { NOISE } = require('libp2p-noise')
 
+const { isNode } = require('ipfs-utils/src/env')
+
 const Peers = require('../fixtures/peers')
 const RelayPeer = require('../fixtures/relay')
 
@@ -89,11 +91,6 @@ async function createPeers ({ number = 1, started = true, seedAddressBook = true
   return peers
 }
 
-// TODO: use ipfs-utils
-function isBrowser () {
-  return typeof window === 'object' || typeof self === 'object'
-}
-
 /**
  * Selectively determine the listen address based on the operating environment
  *
@@ -103,12 +100,12 @@ function isBrowser () {
  * @return {multiaddr}
  */
 function getListenAddress (peerId) {
-  if (isBrowser()) {
-    // browser
-    return multiaddr(`${RelayPeer.multiaddr}/p2p-circuit/p2p/${peerId.toB58String()}`)
-  } else {
+  if (isNode) {
     // node
     return multiaddr('/ip4/127.0.0.1/tcp/0/ws')
+  } else {
+    // browser
+    return multiaddr(`${RelayPeer.multiaddr}/p2p-circuit/p2p/${peerId.toB58String()}`)
   }
 }
 

@@ -1,9 +1,6 @@
 'use strict'
 
-const debug = require('debug')
 const debugName = 'libp2p:floodsub'
-const log = debug(debugName)
-log.error = debug(`${debugName}:error`)
 
 const TimeCache = require('time-cache')
 const BaseProtocol = require('libp2p-interfaces/src/pubsub')
@@ -80,7 +77,7 @@ class FloodSub extends BaseProtocol {
         return
       }
       peers.forEach((id) => {
-        log('publish msgs on topics', message.topicIDs, id)
+        this.log('publish msgs on topics', message.topicIDs, id)
         if (id !== this.peerId.toB58String()) {
           this._sendRpc(id, { msgs: [utils.normalizeOutRpcMessage(message)] })
         }
