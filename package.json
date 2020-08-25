@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "debug": "^4.1.1",
-    "libp2p-interfaces": "libp2p/js-libp2p-interfaces#feat/interface-pubsub",
+    "libp2p-interfaces": "^0.5.1",
     "time-cache": "^0.3.0",
     "uint8arrays": "^1.1.0"
   },
