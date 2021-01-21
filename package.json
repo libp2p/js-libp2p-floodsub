@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "debug": "^4.2.0",
-    "libp2p-interfaces": "^0.10.0",
+    "libp2p-interfaces": "libp2p/js-libp2p-interfaces#chore/complete-pubsub-tests",
     "time-cache": "^0.3.0",
     "uint8arrays": "^2.1.4"
   },
