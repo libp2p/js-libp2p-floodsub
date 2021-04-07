@@ -9,11 +9,11 @@
     "test": "aegir test",
     "test:node": "aegir test -t node",
     "test:browser": "aegir test -t browser",
-    "build": "aegir build",
+    "build": "aegir build --no-types",
     "docs": "aegir-docs",
-    "release": "aegir release --docs",
-    "release-minor": "aegir release --type minor --docs",
-    "release-major": "aegir release --type major --docs",
+    "release": "aegir release --docs --no-types",
+    "release-minor": "aegir release --no-types --type minor --docs",
+    "release-major": "aegir release --no-types --type major --docs",
     "coverage": "aegir coverage",
     "coverage-publish": "aegir coverage --provider coveralls"
   },
@@ -42,24 +42,27 @@
   },
   "homepage": "https://github.com/libp2p/js-libp2p-floodsub#readme",
   "devDependencies": {
-    "aegir": "^28.1.0",
+    "aegir": "^33.0.0",
     "benchmark": "^2.1.4",
-    "chai": "^4.2.0",
-    "ipfs-utils": "^4.0.1",
+    "chai": "^4.3.4",
+    "ipfs-utils": "^6.0.6",
+    "it-pair": "^1.0.0",
     "libp2p": "^0.30.0",
     "libp2p-mplex": "^0.10.1",
     "libp2p-noise": "^2.0.1",
     "libp2p-websockets": "^0.14.0",
     "multiaddr": "^8.1.1",
+    "os": "^0.1.1",
     "p-wait-for": "^3.1.0",
     "peer-id": "^0.14.2",
-    "sinon": "^9.2.1"
+    "sinon": "^10.0.0",
+    "url": "^0.11.0"
   },
   "dependencies": {
     "debug": "^4.2.0",
-    "libp2p-interfaces": "^0.8.1",
+    "libp2p-interfaces": "libp2p/js-libp2p-interfaces#chore/update-pubsub-interface",
     "time-cache": "^0.3.0",
-    "uint8arrays": "^1.1.0"
+    "uint8arrays": "^2.1.4"
   },
   "peerDependencies": {
     "libp2p": "^0.30.0"
