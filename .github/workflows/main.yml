@@ -14,8 +14,8 @@ jobs:
     - uses: actions/checkout@v2
     - run: npm install
     - run: npx aegir lint
-    - run: npx aegir dep-check -- -i wrtc -i electron-webrtc
-    - run: npx aegir build --no-types
+    - run: npx aegir dep-check
+    - run: npx aegir build
   test-node:
     needs: check
     runs-on: ${{ matrix.os }}
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm install
-      - run: npx nyc --reporter=lcov aegir test -t node -- --bail
+      - run: npx aegir test -t node --cov --bail
       - uses: codecov/codecov-action@v1
   test-chrome:
     needs: check
@@ -45,7 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: npm install
-      - run: npx aegir test -t browser -t webworker --bail -- --browsers FirefoxHeadless
+      - run: npx aegir test -t browser -t webworker --bail -- --browser firefox
   test-webkit:
     needs: check
     runs-on: ubuntu-latest
