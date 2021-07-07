@@ -53,7 +53,7 @@ class FloodSub extends BaseProtocol {
    */
   async _processRpcMessage (message) {
     // Check if I've seen the message, if yes, ignore
-    const seqno = this.getMsgId(message)
+    const seqno = await this.getMsgId(message)
     const msgIdStr = toString(seqno, 'base64')
 
     if (this.seenCache.has(msgIdStr)) {
