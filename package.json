@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "debug": "^4.2.0",
-    "libp2p-interfaces": "https://gitpkg.now.sh/libp2p/js-libp2p-interfaces/packages/interfaces?fix/make-tests-more-reliable",
+    "libp2p-interfaces": "https://gitpkg.now.sh/libp2p/js-libp2p-interfaces/packages/interfaces?fix/make-tests-more-reliable&scripts.postinstall=npm%20install%20--ignore-scripts%20%26%26%20npm%20run%20build",
     "time-cache": "^0.3.0",
     "uint8arrays": "^2.1.5"
   },
