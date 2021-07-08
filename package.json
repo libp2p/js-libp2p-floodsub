@@ -6,7 +6,7 @@
   "main": "src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
-    "lint": "aegir lint",
+    "lint": "aegir ts -p check && aegir lint",
     "test": "aegir test",
     "test:node": "aegir test -t node",
     "test:browser": "aegir test -t browser",
@@ -56,6 +56,7 @@
     "libp2p-noise": "^3.1.0",
     "libp2p-websockets": "^0.16.0",
     "multiaddr": "^10.0.0",
+    "multiformats": "^9.2.0",
     "os": "^0.1.1",
     "p-wait-for": "^3.1.0",
     "peer-id": "^0.15.0",
