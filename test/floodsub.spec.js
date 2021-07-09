@@ -109,4 +109,8 @@ describe('floodsub', () => {
 
     expect(messageToEmit).to.eql(expected)
   })
+
+  it.skip('does not send received message back to original sender', async () => {
+
+  })
 })

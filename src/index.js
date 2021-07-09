@@ -90,7 +90,7 @@ class FloodSub extends BaseProtocol {
       }
       peers.forEach((id) => {
         this.log('publish msgs on topics', message.topicIDs, id)
-        if (id !== this.peerId.toB58String()) {
+        if (id !== this.peerId.toB58String() && id !== message.receivedFrom) {
           this._sendRpc(id, { msgs: [utils.normalizeOutRpcMessage(message)] })
         }
       })
