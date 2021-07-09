@@ -110,7 +110,31 @@ describe('floodsub', () => {
     expect(messageToEmit).to.eql(expected)
   })
 
-  it.skip('does not send received message back to original sender', async () => {
+  it('does not send received message back to original sender', async () => {
+    sinon.spy(floodsub, '_sendRpc')
 
+    const sender = await PeerId.create()
+
+    const peerStream = new PeerStreams({
+      id: sender,
+      protocol: 'test'
+    })
+    const rpc = {
+      subscriptions: [],
+      msgs: [{
+        receivedFrom: peerStream.id.toB58String(),
+        data: message,
+        topicIDs: [topic]
+      }]
+    }
+
+    // otherPeer is subscribed to the topic
+    floodsub.topics.set(topic, new Set([sender.toB58String()]))
+
+    // receive the message
+    await floodsub._processRpc(peerStream.id.toB58String(), peerStream, rpc)
+
+    // should not forward back to the sender
+    expect(floodsub._sendRpc.called).to.be.false()
   })
 })
