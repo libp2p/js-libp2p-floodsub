@@ -65,7 +65,7 @@
   },
   "dependencies": {
     "debug": "^4.2.0",
-    "libp2p-interfaces": "^2.0.1",
+    "libp2p-interfaces": "^4.0.0",
     "time-cache": "^0.3.0",
     "uint8arrays": "^3.0.0"
   },
