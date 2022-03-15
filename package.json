@@ -130,7 +130,7 @@
     "lint": "aegir lint",
     "dep-check": "aegir dep-check dist/src/**/*.js dist/test/**/*.js",
     "build": "tsc && npm run build:copy-proto-files",
-    "build:copy-proto-files": "mkdir -p dist/src/message && cp src/message/*.js src/message/*.d.ts dist/src/message",
+    "build:copy-proto-files": "mkdirp dist/src/message && cp src/message/*.js src/message/*.d.ts dist/src/message",
     "generate": "npm run generate:proto && npm run generate:proto-types",
     "generate:proto": "pbjs -t static-module -w es6 -r libp2p-floodsub --force-number --no-verify --no-delimited --no-create --no-beautify --no-defaults --lint eslint-disable -o src/message/rpc.js ./src/message/rpc.proto",
     "generate:proto-types": "pbts -o src/message/rpc.d.ts src/message/rpc.js",
