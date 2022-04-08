@@ -150,6 +150,7 @@
   },
   "devDependencies": {
     "@libp2p/interface-compliance-tests": "^1.1.21",
+    "@libp2p/peer-collections": "^1.0.1",
     "@libp2p/peer-id": "^1.1.9",
     "@libp2p/peer-id-factory": "^1.0.9",
     "@multiformats/multiaddr": "^10.1.8",
