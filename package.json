@@ -127,11 +127,11 @@
     ]
   },
   "scripts": {
+    "clean": "aegir clean",
     "lint": "aegir lint",
     "dep-check": "aegir dep-check",
     "build": "aegir build",
     "generate": "protons ./src/message/rpc.proto",
-    "pretest": "npm run build",
     "test": "aegir test -f dist/test",
     "test:chrome": "aegir test -t browser --cov",
     "test:chrome-webworker": "aegir test -t webworker",
