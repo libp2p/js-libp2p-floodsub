@@ -158,7 +158,7 @@
     "multiformats": "^9.4.5",
     "p-wait-for": "^4.1.0",
     "protons": "^3.0.3",
-    "sinon": "^13.0.1",
+    "sinon": "^14.0.0",
     "wherearewe": "^1.0.0"
   }
 }
