@@ -149,7 +149,7 @@
     "uint8arrays": "^3.0.0"
   },
   "devDependencies": {
-    "@libp2p/interface-compliance-tests": "^1.1.25",
+    "@libp2p/interface-compliance-tests": "^2.0.1",
     "@libp2p/peer-collections": "^1.0.2",
     "@libp2p/peer-id": "^1.1.10",
     "@libp2p/peer-id-factory": "^1.0.9",
