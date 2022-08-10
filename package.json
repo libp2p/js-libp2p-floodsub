@@ -166,7 +166,7 @@
     "aegir": "^37.2.0",
     "multiformats": "^9.4.5",
     "p-wait-for": "^5.0.0",
-    "protons": "^4.0.1",
+    "protons": "^5.0.0",
     "sinon": "^14.0.0",
     "wherearewe": "^1.0.0"
   }
