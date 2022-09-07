@@ -13,9 +13,8 @@
 - [Install](#install)
 - [Don't use this module](#dont-use-this-module)
 - [Usage](#usage)
-- [Contribute](#contribute)
 - [License](#license)
-- [Contribution](#contribution)
+- [Contribute](#contribute)
 
 ## Install
 
@@ -48,12 +47,6 @@ fsub.subscribe('fruit')
 fsub.publish('fruit', new TextEncoder().encode('banana'))
 ```
 
-## Contribute
-
-Feel free to join in. All welcome. Open an [issue](https://github.com/libp2p/js-libp2p-pubsub/issues)!
-
-This repository falls under the IPFS [Code of Conduct](https://github.com/ipfs/community/blob/master/code-of-conduct.md).
-
 ## License
 
 Licensed under either of
@@ -61,6 +54,6 @@ Licensed under either of
 - Apache 2.0, ([LICENSE-APACHE](LICENSE-APACHE) / <http://www.apache.org/licenses/LICENSE-2.0>)
 - MIT ([LICENSE-MIT](LICENSE-MIT) / <http://opensource.org/licenses/MIT>)
 
-## Contribution
+## Contribute
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
