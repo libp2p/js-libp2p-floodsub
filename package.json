@@ -162,7 +162,7 @@
     "@libp2p/peer-collections": "^2.0.0",
     "@libp2p/peer-id": "^1.1.10",
     "@libp2p/peer-id-factory": "^1.0.9",
-    "@multiformats/multiaddr": "^10.1.8",
+    "@multiformats/multiaddr": "^11.0.3",
     "aegir": "^37.2.0",
     "multiformats": "^9.4.5",
     "p-wait-for": "^5.0.0",
