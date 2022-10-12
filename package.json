@@ -158,7 +158,7 @@
   "devDependencies": {
     "@libp2p/components": "^3.0.1",
     "@libp2p/interface-mocks": "^6.0.1",
-    "@libp2p/interface-pubsub-compliance-tests": "^2.0.1",
+    "@libp2p/interface-pubsub-compliance-tests": "^3.0.0",
     "@libp2p/peer-collections": "^2.0.0",
     "@libp2p/peer-id": "^1.1.10",
     "@libp2p/peer-id-factory": "^1.0.9",
