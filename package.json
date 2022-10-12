@@ -164,7 +164,7 @@
     "@libp2p/peer-id-factory": "^1.0.9",
     "@multiformats/multiaddr": "^11.0.3",
     "aegir": "^37.2.0",
-    "multiformats": "^9.4.5",
+    "multiformats": "^10.0.0",
     "p-wait-for": "^5.0.0",
     "protons": "^5.1.0",
     "sinon": "^14.0.0",
