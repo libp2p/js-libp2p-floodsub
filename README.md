@@ -32,10 +32,10 @@ Instead please use [gossipsub](https://www.npmjs.com/package/@chainsafe/libp2p-g
 ## Usage
 
 ```JavaScript
-import { createLibp2p } from 'libp2p'
+import { createLibp2pNode } from 'libp2p'
 import { floodsub } from '@libp2p/floodsub'
 
-const node = await createLibp2p({
+const node = await createLibp2pNode({
   pubsub: floodsub()
   //... other options
 })
