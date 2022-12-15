@@ -156,7 +156,7 @@
     "uint8arrays": "^4.0.2"
   },
   "devDependencies": {
-    "@libp2p/interface-mocks": "^7.0.1",
+    "@libp2p/interface-mocks": "^8.0.3",
     "@libp2p/interface-pubsub-compliance-tests": "^4.0.0",
     "@libp2p/peer-collections": "^2.0.0",
     "@libp2p/peer-id": "^1.1.10",
